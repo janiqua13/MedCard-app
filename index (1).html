@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MedCard — Emergency Information</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --red: #C0392B; --gold: #C9A84C; --gold-light: #FDF6E3;
+      --green: #2E7D32; --green-bg: #EAF3DE;
+      --text: #1a1a1a; --muted: #666; --border: #e5e5e5;
+      --surface: #fff; --page-bg: #f8f4ec;
+    }
+    body {
+      font-family: Georgia, 'Times New Roman', serif;
+      background: var(--page-bg);
+      color: var(--text);
+      min-height: 100vh;
+    }
+
+    /* TOP BANNER */
+    .em-banner {
+      background: var(--red);
+      color: #fff;
+      padding: 1rem 1.25rem;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .em-cross { font-size: 28px; flex-shrink: 0; }
+    .em-title { font-size: 17px; font-weight: bold; }
+    .em-sub { font-size: 12px; opacity: 0.85; margin-top: 2px; }
+
+    .container { max-width: 520px; margin: 0 auto; padding: 1.25rem 1rem 3rem; }
+
+    /* LOADING / ERROR */
+    .state-msg { text-align: center; padding: 3rem 1rem; color: var(--muted); font-size: 15px; }
+    .state-msg .icon { font-size: 40px; margin-bottom: 0.75rem; }
+    .state-msg h2 { font-size: 18px; color: var(--text); margin-bottom: 0.5rem; }
+
+    /* PATIENT HEADER CARD */
+    .patient-header {
+      background: linear-gradient(135deg, #F5D060 0%, #C9A84C 40%, #E8C060 70%, #A07828 100%);
+      border-radius: 16px;
+      padding: 1.25rem 1.5rem;
+      margin-bottom: 1.25rem;
+      position: relative;
+      overflow: hidden;
+      box-shadow: 0 4px 18px rgba(180,140,30,0.3);
+    }
+    .patient-header::before {
+      content: ''; position: absolute; top: -25px; right: -25px;
+      width: 100px; height: 100px;
+      background: rgba(255,255,255,0.08); border-radius: 50%;
+    }
+    .patient-logo { font-size: 11px; font-weight: bold; color: #6B4A00; letter-spacing: 0.06em; text-transform: uppercase; margin-bottom: 10px; }
+    .patient-name { font-size: 22px; font-weight: bold; color: #3A2800; margin-bottom: 3px; }
+    .patient-dob { font-size: 13px; color: #6B4A00; margin-bottom: 12px; }
+    .patient-meta { display: flex; gap: 10px; flex-wrap: wrap; }
+    .meta-chip {
+      background: rgba(255,255,255,0.45);
+      border-radius: 20px; padding: 4px 14px;
+      font-size: 13px; font-weight: bold; color: #3A2800;
+    }
+    .meta-chip.blood { background: rgba(192,57,43,0.2); color: #5A1010; }
+
+    /* INFO CARDS */
+    .info-card {
+      background: var(--surface);
+      border: 1.5px solid #e8d9a0;
+      border-radius: 14px;
+      padding: 1rem 1.25rem;
+      margin-bottom: 0.9rem;
+    }
+    .card-heading {
+      font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase;
+      color: #8B6914; font-weight: bold; margin-bottom: 0.6rem;
+    }
+    .info-row {
+      display: flex; justify-content: space-between;
+      align-items: baseline; padding: 5px 0;
+      font-size: 14px; border-bottom: 0.5px solid var(--border);
+    }
+    .info-row:last-child { border-bottom: none; }
+    .info-label { color: var(--muted); font-size: 13px; }
+    .info-value { font-weight: 600; text-align: right; max-width: 62%; }
+    .info-value.danger { color: var(--red); }
+    .info-value.safe { color: var(--green); }
+
+    /* PILL TAGS */
+    .pill-row { display: flex; flex-wrap: wrap; gap: 6px; padding-top: 4px; }
+    .pill {
+      display: inline-block; border-radius: 20px;
+      padding: 3px 12px; font-size: 13px; font-weight: bold;
+    }
+    .pill-red { background: #FDECEA; color: #C0392B; }
+    .pill-green { background: var(--green-bg); color: #2E7D32; }
+
+    /* DIRECTIVE CHIPS */
+    .directive-row { display: flex; gap: 10px; flex-wrap: wrap; padding-top: 4px; }
+    .directive-chip {
+      border-radius: 10px; padding: 8px 14px;
+      font-size: 13px; font-weight: bold; flex: 1; min-width: 120px; text-align: center;
+    }
+    .directive-yes { background: var(--green-bg); color: #2E7D32; }
+    .directive-no { background: #f5f5f5; color: var(--muted); }
+    .directive-warn { background: #FDECEA; color: var(--red); }
+    .directive-label { font-size: 11px; font-weight: normal; display: block; margin-bottom: 2px; opacity: 0.8; }
+
+    /* FOOTER */
+    .footer {
+      margin-top: 2rem; text-align: center;
+      font-size: 12px; color: var(--muted); line-height: 1.6;
+    }
+    .footer strong { color: var(--text); }
+    .updated-badge {
+      display: inline-block; background: var(--gold-light);
+      border: 1px solid #e0c870; border-radius: 20px;
+      padding: 3px 12px; font-size: 11px; color: #8B6914;
+      margin-bottom: 0.75rem;
+    }
+  </style>
+</head>
+<body>
+
+<div class="em-banner">
+  <div class="em-cross">&#10010;</div>
+  <div>
+    <div class="em-title">Emergency Medical Information</div>
+    <div class="em-sub">For authorized medical personnel — no login required</div>
+  </div>
+</div>
+
+<div class="container">
+  <div id="loading" class="state-msg">
+    <div class="icon">&#8987;</div>
+    <h2>Loading patient info...</h2>
+    <p>Please wait a moment</p>
+  </div>
+  <div id="error" class="state-msg" style="display:none">
+    <div class="icon">&#10006;</div>
+    <h2>Record not found</h2>
+    <p>This QR code may be invalid or the patient record may have been removed.<br>Please contact the patient's emergency contacts directly.</p>
+  </div>
+  <div id="content" style="display:none"></div>
+</div>
+
+<script>
+  // ─── CONFIG: Replace with your Supabase project URL and anon key ───
+  const SUPABASE_URL = 'https://ehtawogwkhqemctdtzcg.supabase.co';
+  const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVodGF3b2d3a2hxZW1jdGR0emNnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY2NTY5NTcsImV4cCI6MjA5MjIzMjk1N30.3ZU-0LU4W6-Q31WbaCbfDCL7AeHtAUjRq5908MsgJpo';
+  // ──────────────────────────────────────────────────────────────────
+
+  const { createClient } = supabase;
+  const db = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+  // Get the patient slug from the URL: /emergency/abc123
+  function getSlug() {
+    const parts = window.location.pathname.split('/');
+    return parts[parts.length - 1] || parts[parts.length - 2];
+  }
+
+  function fmt(val, fallback = '—') {
+    if (!val || (Array.isArray(val) && val.length === 0)) return fallback;
+    return val;
+  }
+
+  function pills(arr, cls) {
+    if (!arr || arr.length === 0) return '<span style="font-size:13px;color:#999">None recorded</span>';
+    return arr.map(a => `<span class="pill ${cls}">${a}</span>`).join('');
+  }
+
+  function directiveChip(label, value) {
+    const isYes = String(value).toLowerCase() === 'true' || String(value).toLowerCase() === 'yes';
+    const cls = label === 'DNR on file' && isYes ? 'directive-warn' : (isYes ? 'directive-yes' : 'directive-no');
+    return `<div class="directive-chip ${cls}"><span class="directive-label">${label}</span>${isYes ? 'Yes' : 'No'}</div>`;
+  }
+
+  function formatDOB(dob) {
+    if (!dob) return '—';
+    // Calculate age
+    const parts = dob.split('/');
+    if (parts.length !== 3) return dob;
+    const birth = new Date(parts[2], parts[0]-1, parts[1]);
+    const age = Math.floor((Date.now() - birth) / (365.25 * 24 * 60 * 60 * 1000));
+    return `${dob} (Age ${age})`;
+  }
+
+  function render(p) {
+    const updatedDate = new Date(p.created_at).toLocaleDateString('en-US', { month:'long', day:'numeric', year:'numeric' });
+    document.getElementById('content').innerHTML = `
+
+      <div class="patient-header">
+        <div class="patient-logo">&#10010; MedCard Emergency Record</div>
+        <div class="patient-name">${fmt(p.full_name, 'Unknown Patient')}</div>
+        <div class="patient-dob">DOB: ${formatDOB(p.dob)}</div>
+        <div class="patient-meta">
+          <span class="meta-chip blood">Blood: ${fmt(p.blood_type, 'Unknown')}</span>
+          ${p.weight_lbs ? `<span class="meta-chip">${p.weight_lbs} lbs</span>` : ''}
+        </div>
+      </div>
+
+      <div class="info-card">
+        <div class="card-heading">&#9888; Allergies</div>
+        <div class="pill-row">${pills(p.allergies, 'pill-red')}</div>
+      </div>
+
+      <div class="info-card">
+        <div class="card-heading">Current Medications</div>
+        <div class="pill-row">${pills(p.medications, 'pill-green')}</div>
+      </div>
+
+      <div class="info-card">
+        <div class="card-heading">Medical Conditions</div>
+        <div class="info-row">
+          <span class="info-label">Active conditions</span>
+          <span class="info-value">${fmt(p.conditions)}</span>
+        </div>
+        ${p.surgery_history ? `<div class="info-row"><span class="info-label">Surgical history</span><span class="info-value">${p.surgery_history}</span></div>` : ''}
+        ${p.emergency_notes ? `<div class="info-row"><span class="info-label">Notes for staff</span><span class="info-value">${p.emergency_notes}</span></div>` : ''}
+      </div>
+
+      <div class="info-card">
+        <div class="card-heading">Emergency Contacts</div>
+        <div class="info-row">
+          <span class="info-label">Primary contact</span>
+          <span class="info-value">${fmt(p.ec1_name)} &mdash; <a href="tel:${p.ec1_phone}" style="color:#185FA5">${fmt(p.ec1_phone)}</a></span>
+        </div>
+        <div class="info-row">
+          <span class="info-label">Physician</span>
+          <span class="info-value">${fmt(p.doctor_name)} &mdash; <a href="tel:${p.doctor_phone}" style="color:#185FA5">${fmt(p.doctor_phone)}</a></span>
+        </div>
+      </div>
+
+      <div class="info-card">
+        <div class="card-heading">Advance Directives</div>
+        <div class="directive-row">
+          ${directiveChip('DNR on file', p.dnr)}
+          ${directiveChip('Organ donor', p.organ_donor)}
+        </div>
+      </div>
+
+      <div class="footer">
+        <div class="updated-badge">&#128337; Record last updated: ${updatedDate}</div><br>
+        <strong>Card ID: ${p.card_id}</strong><br>
+        This record is maintained by the patient via the MedCard app.<br>
+        For the most current information, contact the patient's physician.
+      </div>
+    `;
+
+    document.title = `MedCard — ${p.full_name || 'Emergency Info'}`;
+    document.getElementById('loading').style.display = 'none';
+    document.getElementById('content').style.display = 'block';
+  }
+
+  async function load() {
+    const slug = getSlug();
+    if (!slug) { showError(); return; }
+
+    const { data, error } = await db
+      .from('patients')
+      .select(`
+        full_name, dob, blood_type, weight_lbs,
+        allergies, medications, conditions, surgery_history, emergency_notes,
+        ec1_name, ec1_phone, doctor_name, doctor_phone,
+        dnr, organ_donor, card_id, created_at
+      `)
+      .eq('card_slug', slug)
+      .single();
+
+    if (error || !data) { showError(); return; }
+    render(data);
+  }
+
+  function showError() {
+    document.getElementById('loading').style.display = 'none';
+    document.getElementById('error').style.display = 'block';
+  }
+
+  load();
+</script>
+</body>
+</html>
