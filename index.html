@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>MedCard — My Health Card</title>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     :root {
@@ -18,27 +19,16 @@
     .screen { display: none; animation: fi 0.25s ease; }
     .screen.active { display: block; }
     @keyframes fi { from { opacity:0; transform:translateY(6px); } to { opacity:1; transform:none; } }
-
-    /* ── GOLDEN CARD ── */
-    .golden-card {
-      background: linear-gradient(135deg,#F5D060 0%,#C9A84C 40%,#E8C060 70%,#A07828 100%);
-      border-radius: 18px; padding: 1.4rem; margin: 0.5rem 0 1.25rem;
-      position: relative; overflow: hidden;
-      box-shadow: 0 4px 20px rgba(180,140,30,0.35);
-    }
+    .golden-card { background: linear-gradient(135deg,#F5D060 0%,#C9A84C 40%,#E8C060 70%,#A07828 100%); border-radius: 18px; padding: 1.4rem; margin: 0.5rem 0 1.25rem; position: relative; overflow: hidden; box-shadow: 0 4px 20px rgba(180,140,30,0.35); }
     .golden-card::before { content:''; position:absolute; top:-30px; right:-30px; width:110px; height:110px; background:rgba(255,255,255,0.08); border-radius:50%; }
     .card-logo { font-size:11px; font-weight:bold; color:#6B4A00; letter-spacing:0.06em; text-transform:uppercase; margin-bottom:10px; }
     .card-name { font-size:17px; font-weight:bold; color:#3A2800; margin-bottom:2px; }
     .card-id { font-size:11px; color:#6B4A00; margin-bottom:14px; }
     .card-bottom { display:flex; justify-content:space-between; align-items:flex-end; }
-    .card-qr { width:62px; height:62px; background:#fff; border-radius:6px; padding:5px; display:flex; align-items:center; justify-content:center; }
-    .qr-grid { display:grid; grid-template-columns:repeat(7,1fr); gap:1px; width:100%; height:100%; }
-    .qr-cell { background:#000; border-radius:0.5px; }
-    .qr-cell.w { background:#fff; }
-    .card-url { font-size:9px; color:#6B4A00; text-align:right; line-height:1.5; word-break:break-all; max-width:180px; }
-    .card-cross { font-size:20px; color:#8B0000; opacity:0.85; }
-
-    /* ── BUTTONS ── */
+    .card-qr { width:70px; height:70px; background:#fff; border-radius:6px; padding:3px; display:flex; align-items:center; justify-content:center; overflow:hidden; }
+    .card-qr canvas { width:100% !important; height:100% !important; }
+    .card-cross { font-size:20px; color:#8B0000; opacity:0.85; margin-bottom:4px; }
+    .card-tag { font-size:10px; color:#6B4A00; text-align:right; line-height:1.5; }
     .btn { display:block; width:100%; padding:0.8rem 1rem; border-radius:10px; font-size:15px; cursor:pointer; border:none; font-family:inherit; font-weight:600; transition:opacity 0.15s,transform 0.1s; text-align:center; margin-bottom:0.65rem; }
     .btn:last-child { margin-bottom:0; }
     .btn:active { transform:scale(0.98); opacity:0.85; }
@@ -47,32 +37,25 @@
     .btn-caregiver { background:#2C3E50; color:#fff; }
     .btn-outline { background:transparent; border:1.5px solid var(--gold); color:var(--gold-dark); }
     .btn-gold { background:var(--gold); color:#3A2800; }
-    .btn-dark { background:#2C3E50; color:#fff; }
     .btn-ghost { background:transparent; border:none; color:var(--muted); font-family:inherit; font-size:13px; cursor:pointer; padding:0.4rem; display:block; width:100%; text-align:center; }
     .btn-link { background:none; border:none; color:#185FA5; font-family:inherit; font-size:14px; cursor:pointer; text-decoration:underline; padding:0; }
-    .btn-sm { padding:0.55rem 0.9rem; font-size:13px; }
-
-    /* ── HEADERS ── */
+    .btn-add { display:flex; align-items:center; justify-content:center; gap:8px; width:100%; padding:0.75rem; border-radius:10px; border:2px dashed var(--gold); background:var(--gold-bg); color:var(--gold-dark); font-family:inherit; font-size:14px; font-weight:600; cursor:pointer; margin-bottom:0.65rem; }
     .app-header { display:flex; align-items:center; gap:10px; margin-bottom:1.1rem; }
     .back-btn { background:none; border:none; font-size:20px; cursor:pointer; color:var(--gold-dark); padding:0 6px 0 0; flex-shrink:0; }
     .app-title { font-size:17px; font-weight:bold; color:var(--text); }
     .app-subtitle { font-size:12px; color:var(--muted); margin-top:1px; }
-    .section-label { font-size:11px; letter-spacing:0.1em; text-transform:uppercase; color:var(--gold-dark); font-weight:bold; margin-bottom:0.4rem; margin-top:0.25rem; }
+    .section-label { font-size:11px; letter-spacing:0.1em; text-transform:uppercase; color:var(--gold-dark); font-weight:bold; margin-bottom:0.5rem; margin-top:0.25rem; }
     hr.div { border:none; border-top:0.5px solid var(--border); margin:1rem 0; }
-
-    /* ── FORMS ── */
-    .form-group { margin-bottom:0.85rem; }
+    .form-group { margin-bottom:0.9rem; }
     .form-label { font-size:13px; color:var(--muted); margin-bottom:4px; display:block; }
-    .form-input { width:100%; padding:0.6rem 0.8rem; border-radius:8px; border:1.5px solid var(--gold); font-size:14px; font-family:inherit; color:var(--text); background:var(--surface); outline:none; }
+    .form-input { width:100%; padding:0.65rem 0.85rem; border-radius:8px; border:1.5px solid var(--gold); font-size:14px; font-family:inherit; color:var(--text); background:var(--surface); outline:none; }
     .form-input:focus { border-color:var(--gold-dark); box-shadow:0 0 0 3px rgba(201,168,76,0.15); }
-    .form-textarea { resize:vertical; min-height:65px; }
-    .tag-input-area { display:flex; flex-wrap:wrap; gap:6px; border:1.5px solid var(--gold); border-radius:8px; padding:0.45rem; background:var(--surface); }
-    .tag { display:inline-flex; align-items:center; gap:4px; background:var(--gold-bg); border:1px solid var(--gold); border-radius:20px; padding:2px 10px; font-size:13px; color:var(--gold-dark); }
-    .tag-x { font-size:11px; color:var(--muted); cursor:pointer; }
-    .mini-input { border:none; outline:none; font-size:13px; font-family:inherit; width:110px; color:var(--text); background:transparent; }
+    .form-select { width:100%; padding:0.65rem 0.85rem; border-radius:8px; border:1.5px solid var(--gold); font-size:14px; font-family:inherit; color:var(--text); background:var(--surface); outline:none; appearance:none; background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%238B6914' stroke-width='1.5' fill='none'/%3E%3C/svg%3E"); background-repeat:no-repeat; background-position:right 12px center; padding-right:32px; }
+    .form-textarea { resize:vertical; min-height:70px; width:100%; padding:0.65rem 0.85rem; border-radius:8px; border:1.5px solid var(--gold); font-size:14px; font-family:inherit; color:var(--text); background:var(--surface); outline:none; }
     .form-error { color:var(--red); font-size:13px; margin-top:4px; min-height:16px; }
-
-    /* ── PIN ── */
+    .radio-group { display:flex; flex-wrap:wrap; gap:8px; }
+    .radio-btn { padding:0.55rem 1rem; border-radius:8px; border:1.5px solid var(--border); background:var(--surface); font-size:13px; font-family:inherit; cursor:pointer; color:var(--text); transition:all 0.15s; }
+    .radio-btn.selected { border-color:var(--gold); background:var(--gold-bg); color:var(--gold-dark); font-weight:600; }
     .passcode-dots { display:flex; gap:14px; justify-content:center; margin:1.25rem 0 0.75rem; }
     .dot { width:18px; height:18px; border-radius:50%; border:2px solid var(--gold); background:transparent; transition:background 0.15s; }
     .dot.filled { background:var(--gold); }
@@ -83,56 +66,64 @@
     .pin-error { color:var(--red); text-align:center; font-size:13px; min-height:18px; }
     .pin-step-label { text-align:center; font-size:14px; font-weight:600; margin-bottom:0.2rem; }
     .pin-hint { text-align:center; font-size:12px; color:var(--muted); margin-bottom:0.5rem; min-height:16px; }
-
-    /* ── BIOMETRIC ── */
     .bio-circle { width:88px; height:88px; border-radius:50%; border:3px solid var(--gold); margin:1.25rem auto; display:flex; align-items:center; justify-content:center; font-size:36px; cursor:pointer; background:var(--gold-bg); transition:background 0.2s; }
     .bio-circle.scanning { background:#FDF0C0; border-color:var(--gold-dark); animation:pulse 1s infinite; }
     @keyframes pulse { 0%,100%{box-shadow:0 0 0 0 rgba(201,168,76,0.4)} 50%{box-shadow:0 0 0 10px rgba(201,168,76,0)} }
     .bio-status { text-align:center; font-size:13px; color:var(--muted); margin-bottom:1rem; }
-
-    /* ── INFO BOXES ── */
-    .notice { background:var(--gold-bg); border:1px solid #e0c870; border-radius:10px; padding:0.8rem 1rem; font-size:13px; color:#6B4A00; margin-bottom:1rem; line-height:1.5; }
+    .item-card { background:var(--surface); border:1.5px solid #e8d9a0; border-radius:12px; padding:0.85rem 1rem; margin-bottom:0.65rem; display:flex; justify-content:space-between; align-items:flex-start; }
+    .item-card-info { flex:1; }
+    .item-card-title { font-size:14px; font-weight:600; color:var(--text); margin-bottom:2px; }
+    .item-card-sub { font-size:12px; color:var(--muted); line-height:1.5; }
+    .item-delete { background:none; border:none; color:#ccc; font-size:18px; cursor:pointer; padding:0 0 0 10px; flex-shrink:0; }
+    .item-delete:hover { color:var(--red); }
+    .severity-pill { display:inline-block; border-radius:20px; padding:2px 10px; font-size:11px; font-weight:bold; margin-top:4px; }
+    .sev-mild { background:#EAF3DE; color:#2E7D32; }
+    .sev-moderate { background:#FFF3CD; color:#856404; }
+    .sev-severe { background:#FDECEA; color:#C0392B; }
+    .sev-lifethreatening { background:#C0392B; color:#fff; }
+    .notice { background:var(--gold-bg); border:1px solid #e0c870; border-radius:10px; padding:0.8rem 1rem; font-size:13px; color:#6B4A00; margin-bottom:1rem; line-height:1.6; }
     .success-box { background:#EAF3DE; border-radius:10px; padding:0.75rem 1rem; font-size:13px; color:var(--green); margin-top:0.75rem; text-align:center; }
-    .loading-box { text-align:center; padding:2rem 1rem; color:var(--muted); font-size:14px; }
+    .definition-box { background:#f0f4ff; border:1px solid #c5d3f0; border-radius:8px; padding:0.75rem; font-size:13px; color:#2c3e6b; margin-top:6px; line-height:1.6; display:none; }
+    .definition-box.show { display:block; }
     .success-icon { text-align:center; font-size:44px; margin:1.25rem 0 0.4rem; }
-
-    /* ── URL SHARE BOX ── */
+    .spinner { display:inline-block; width:16px; height:16px; border:2px solid rgba(255,255,255,0.4); border-top-color:#fff; border-radius:50%; animation:spin 0.7s linear infinite; vertical-align:middle; margin-right:6px; }
+    @keyframes spin { to { transform:rotate(360deg); } }
     .url-box { background:var(--surface); border:1.5px solid var(--gold); border-radius:10px; padding:0.75rem 1rem; display:flex; align-items:center; gap:10px; margin-bottom:1rem; }
-    .url-text { font-size:13px; color:#185FA5; word-break:break-all; flex:1; }
+    .url-text { font-size:12px; color:#185FA5; word-break:break-all; flex:1; }
     .copy-btn { background:var(--gold-bg); border:1px solid var(--gold); border-radius:8px; padding:4px 10px; font-size:12px; font-weight:bold; color:var(--gold-dark); cursor:pointer; white-space:nowrap; flex-shrink:0; }
-
-    /* ── CARD OPTIONS ── */
     .opt-row { display:flex; align-items:flex-start; gap:10px; padding:0.75rem 0; border-bottom:0.5px solid var(--border); }
     .opt-row:last-child { border-bottom:none; }
     .opt-radio { width:18px; height:18px; accent-color:var(--gold); cursor:pointer; margin-top:2px; flex-shrink:0; }
-    .opt-label { font-size:14px; color:var(--text); cursor:pointer; }
+    .opt-label { font-size:14px; color:var(--text); font-weight:600; }
     .opt-sub { font-size:12px; color:var(--muted); margin-top:2px; }
-
+    .portal-nav { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:1rem; }
+    .nav-card { background:var(--surface); border:1.5px solid #e8d9a0; border-radius:12px; padding:0.9rem; text-align:center; cursor:pointer; transition:all 0.15s; }
+    .nav-card:hover { border-color:var(--gold); background:var(--gold-bg); }
+    .nav-card-icon { font-size:24px; margin-bottom:4px; }
+    .nav-card-label { font-size:13px; font-weight:600; color:var(--text); }
+    .nav-card-sub { font-size:11px; color:var(--muted); margin-top:2px; }
     .center { text-align:center; }
     .mt1 { margin-top:0.75rem; }
     .mt-half { margin-top:0.4rem; }
     .mb1 { margin-bottom:0.75rem; }
     .text-muted { color:var(--muted); font-size:13px; }
-    .text-small { font-size:13px; }
-    .spinner { display:inline-block; width:16px; height:16px; border:2px solid rgba(255,255,255,0.4); border-top-color:#fff; border-radius:50%; animation:spin 0.7s linear infinite; vertical-align:middle; margin-right:6px; }
-    @keyframes spin { to { transform:rotate(360deg); } }
+    .empty-state { text-align:center; padding:1.5rem 1rem; color:var(--muted); font-size:13px; }
+    .poa-indent { padding-left:0.5rem; border-left:3px solid var(--gold); margin-bottom:1rem; }
+    .poa-indent .form-group:first-child { margin-top:0.75rem; }
   </style>
 </head>
 <body>
 <div class="app">
 
-  <!-- ══ HOME ══ -->
+  <!-- HOME -->
   <div class="screen active" id="s-home">
     <div class="golden-card">
       <div class="card-logo">&#10010; MedCard</div>
       <div class="card-name" id="home-name">Your Medical Card</div>
       <div class="card-id" id="home-id">Sign in to activate</div>
       <div class="card-bottom">
-        <div class="card-qr"><div class="qr-grid" id="qr-home"></div></div>
-        <div>
-          <div class="card-cross">&#10010;</div>
-          <div class="card-url" id="home-url">Create an account<br>to get your QR code</div>
-        </div>
+        <div class="card-qr"><canvas id="home-qr-canvas"></canvas></div>
+        <div style="text-align:right"><div class="card-cross">&#10010;</div><div class="card-tag">Scan for<br>emergency info</div></div>
       </div>
     </div>
     <div class="section-label">Who are you?</div>
@@ -140,62 +131,35 @@
     <button class="btn btn-patient" onclick="startPatient()">&#128100; I'm the Patient — update my info</button>
     <button class="btn btn-caregiver" onclick="startCaregiver()">&#128101; I'm a Caregiver — full access</button>
     <hr class="div">
-    <div class="center text-small" style="color:var(--muted)">No account yet? <button class="btn-link" onclick="go('s-signup')">Create a free MedCard</button></div>
+    <div class="center text-muted">No account yet? <button class="btn-link" onclick="go('s-signup')">Create a free MedCard</button></div>
   </div>
 
-  <!-- ══ SIGN UP ══ -->
+  <!-- SIGN UP -->
   <div class="screen" id="s-signup">
-    <div class="app-header">
-      <button class="back-btn" onclick="go('s-home')">&#8592;</button>
-      <div><div class="app-title">Create your MedCard</div><div class="app-subtitle">Free — takes about 2 minutes</div></div>
-    </div>
-    <div class="form-group">
-      <label class="form-label">Your full name</label>
-      <input class="form-input" id="su-name" placeholder="Jane Doe" autocomplete="name">
-    </div>
-    <div class="form-group">
-      <label class="form-label">Date of birth (MM/DD/YYYY)</label>
-      <input class="form-input" id="su-dob" placeholder="03/14/1972">
-    </div>
-    <div class="form-group">
-      <label class="form-label">Email address</label>
-      <input class="form-input" id="su-email" type="email" placeholder="you@email.com" autocomplete="email">
-    </div>
-    <div class="form-group">
-      <label class="form-label">Password (at least 8 characters)</label>
-      <input class="form-input" id="su-password" type="password" placeholder="Choose a strong password" autocomplete="new-password">
-    </div>
+    <div class="app-header"><button class="back-btn" onclick="go('s-home')">&#8592;</button><div><div class="app-title">Create your MedCard</div><div class="app-subtitle">Free — takes about 2 minutes</div></div></div>
+    <div class="form-group"><label class="form-label">Your full name</label><input class="form-input" id="su-name" placeholder="Jane Doe"></div>
+    <div class="form-group"><label class="form-label">Date of birth (MM/DD/YYYY)</label><input class="form-input" id="su-dob" placeholder="03/14/1972"></div>
+    <div class="form-group"><label class="form-label">Email address</label><input class="form-input" id="su-email" type="email" placeholder="you@email.com"></div>
+    <div class="form-group"><label class="form-label">Password (at least 8 characters)</label><input class="form-input" id="su-password" type="password" placeholder="Choose a strong password"></div>
     <div class="form-error" id="su-error"></div>
     <button class="btn btn-gold" id="su-btn" onclick="signup()">Create my MedCard</button>
-    <div class="center mt1 text-small" style="color:var(--muted)">Already have an account? <button class="btn-link" onclick="go('s-login')">Sign in</button></div>
+    <div class="center mt1 text-muted">Already have an account? <button class="btn-link" onclick="go('s-login')">Sign in</button></div>
   </div>
 
-  <!-- ══ LOG IN ══ -->
+  <!-- LOG IN -->
   <div class="screen" id="s-login">
-    <div class="app-header">
-      <button class="back-btn" onclick="go('s-home')">&#8592;</button>
-      <div><div class="app-title">Sign in</div><div class="app-subtitle">To your MedCard account</div></div>
-    </div>
-    <div class="form-group">
-      <label class="form-label">Email address</label>
-      <input class="form-input" id="li-email" type="email" placeholder="you@email.com" autocomplete="email">
-    </div>
-    <div class="form-group">
-      <label class="form-label">Password</label>
-      <input class="form-input" id="li-password" type="password" placeholder="Your password" autocomplete="current-password">
-    </div>
+    <div class="app-header"><button class="back-btn" onclick="go('s-home')">&#8592;</button><div><div class="app-title">Sign in</div></div></div>
+    <div class="form-group"><label class="form-label">Email address</label><input class="form-input" id="li-email" type="email" placeholder="you@email.com"></div>
+    <div class="form-group"><label class="form-label">Password</label><input class="form-input" id="li-password" type="password" placeholder="Your password"></div>
     <div class="form-error" id="li-error"></div>
     <button class="btn btn-gold" id="li-btn" onclick="login()">Sign in</button>
     <button class="btn-ghost mt-half" onclick="go('s-signup')">Don't have an account? Sign up free</button>
   </div>
 
-  <!-- ══ SETUP PIN ══ -->
+  <!-- SETUP PIN -->
   <div class="screen" id="s-setup-pin">
-    <div class="app-header">
-      <button class="back-btn" id="setup-back" onclick="go('s-home')">&#8592;</button>
-      <div><div class="app-title" id="setup-title">Set your PIN</div><div class="app-subtitle" id="setup-sub">You'll use this to log in</div></div>
-    </div>
-    <div class="notice" id="setup-notice">&#128274; Your PIN keeps your health info private. Emergency staff can always view critical info without a PIN.</div>
+    <div class="app-header"><button class="back-btn" onclick="go('s-home')">&#8592;</button><div><div class="app-title" id="setup-title">Set your PIN</div><div class="app-subtitle" id="setup-sub">You'll use this to log in</div></div></div>
+    <div class="notice">&#128274; Your PIN keeps your health info private. Emergency staff can always view critical info without a PIN.</div>
     <div class="pin-step-label" id="setup-step-label">Choose a 4-digit PIN</div>
     <div class="passcode-dots" id="setup-dots"></div>
     <div class="pin-hint" id="setup-hint"></div>
@@ -203,59 +167,40 @@
     <div class="pin-grid" id="setup-grid"></div>
   </div>
 
-  <!-- ══ BIO SETUP ══ -->
+  <!-- BIO SETUP -->
   <div class="screen" id="s-bio-setup">
-    <div class="app-header">
-      <button class="back-btn" onclick="go('s-setup-pin')">&#8592;</button>
-      <div><div class="app-title">Add Biometrics</div><div class="app-subtitle">Step 2 of 2 — Caregivers only</div></div>
-    </div>
-    <div class="notice">As a caregiver you get full edit access, so we add fingerprint or face ID as a second security step.</div>
+    <div class="app-header"><button class="back-btn" onclick="go('s-setup-pin')">&#8592;</button><div><div class="app-title">Add Biometrics</div><div class="app-subtitle">Caregivers only — Step 2 of 2</div></div></div>
+    <div class="notice">As a caregiver you get full edit access, so we add fingerprint or Face ID as a second security step.</div>
     <div class="bio-circle" id="bio-setup-btn" onclick="registerBio()">&#128071;</div>
     <div class="bio-status" id="bio-setup-status">Tap to scan your fingerprint</div>
     <hr class="div">
-    <button class="btn btn-outline btn-sm" onclick="registerBio()">&#128065; Use Face ID instead</button>
+    <button class="btn btn-outline" onclick="registerBio()">&#128065; Use Face ID instead</button>
     <button class="btn-ghost mt-half" onclick="skipBio()">Skip for now</button>
   </div>
 
-  <!-- ══ CARD OPTION ══ -->
+  <!-- CARD OPTION -->
   <div class="screen" id="s-card-option">
-    <div class="app-header">
-      <div><div class="app-title">Your Physical Card</div><div class="app-subtitle">Would you like a card to carry?</div></div>
-    </div>
-    <div class="notice">&#128196; A physical golden card with your QR code gives paramedics instant access to your medical info — even if your phone is out of reach.</div>
+    <div class="app-header"><div><div class="app-title">Your Physical Card</div><div class="app-subtitle">Would you like a card to carry?</div></div></div>
+    <div class="notice">&#128196; A physical golden card with your QR code gives paramedics instant access to your info even if your phone is out of reach.</div>
     <div class="golden-card" style="margin-bottom:1rem">
       <div class="card-logo">&#10010; MedCard</div>
       <div class="card-name" id="co-name">Your Name</div>
       <div class="card-id" id="co-id">Card ID</div>
       <div class="card-bottom">
-        <div class="card-qr"><div class="qr-grid" id="qr-co"></div></div>
-        <div><div class="card-cross">&#10010;</div><div class="card-url" id="co-url">your emergency URL</div></div>
+        <div class="card-qr"><canvas id="co-qr-canvas"></canvas></div>
+        <div style="text-align:right"><div class="card-cross">&#10010;</div><div class="card-tag">Scan for<br>emergency info</div></div>
       </div>
     </div>
     <div class="section-label">Your preference</div>
-    <div>
-      <label class="opt-row">
-        <input type="radio" class="opt-radio" name="card-opt" value="print" checked>
-        <div><div class="opt-label">&#128438; Print my card now</div><div class="opt-sub">Opens a print-ready version of your card</div></div>
-      </label>
-      <label class="opt-row">
-        <input type="radio" class="opt-radio" name="card-opt" value="order">
-        <div><div class="opt-label">&#128230; Order a laminated card (coming soon)</div><div class="opt-sub">We'll mail a golden laminated card to your address</div></div>
-      </label>
-      <label class="opt-row">
-        <input type="radio" class="opt-radio" name="card-opt" value="skip">
-        <div><div class="opt-label">&#10006; No card for now</div><div class="opt-sub">You can always print or order one later in settings</div></div>
-      </label>
-    </div>
+    <label class="opt-row"><input type="radio" class="opt-radio" name="card-opt" value="print" checked><div><div class="opt-label">&#128438; Print my card now</div><div class="opt-sub">Opens a print-ready version of your card</div></div></label>
+    <label class="opt-row"><input type="radio" class="opt-radio" name="card-opt" value="order"><div><div class="opt-label">&#128230; Order a laminated card (coming soon)</div><div class="opt-sub">We'll mail a golden laminated card to your address</div></div></label>
+    <label class="opt-row"><input type="radio" class="opt-radio" name="card-opt" value="skip"><div><div class="opt-label">&#10006; No card for now</div><div class="opt-sub">You can always print or order one later</div></div></label>
     <button class="btn btn-gold mt1" onclick="handleCardOption()">Continue to my account</button>
   </div>
 
-  <!-- ══ PATIENT PIN LOGIN ══ -->
+  <!-- PATIENT LOGIN -->
   <div class="screen" id="s-patient-login">
-    <div class="app-header">
-      <button class="back-btn" onclick="go('s-home')">&#8592;</button>
-      <div><div class="app-title">Patient Login</div><div class="app-subtitle">Enter your 4-digit PIN</div></div>
-    </div>
+    <div class="app-header"><button class="back-btn" onclick="go('s-home')">&#8592;</button><div><div class="app-title">Patient Login</div><div class="app-subtitle">Enter your 4-digit PIN</div></div></div>
     <div class="passcode-dots" id="p-dots"></div>
     <div class="pin-error" id="p-error"></div>
     <div class="pin-grid" id="p-grid"></div>
@@ -263,495 +208,415 @@
     <button class="btn-ghost" onclick="go('s-login')">Sign in with email instead</button>
   </div>
 
-  <!-- ══ CAREGIVER PIN LOGIN ══ -->
+  <!-- CAREGIVER LOGIN -->
   <div class="screen" id="s-caregiver-login">
-    <div class="app-header">
-      <button class="back-btn" onclick="go('s-home')">&#8592;</button>
-      <div><div class="app-title">Caregiver Login</div><div class="app-subtitle">Step 1 of 2 — Enter your PIN</div></div>
-    </div>
+    <div class="app-header"><button class="back-btn" onclick="go('s-home')">&#8592;</button><div><div class="app-title">Caregiver Login</div><div class="app-subtitle">Step 1 of 2 — Enter your PIN</div></div></div>
     <div class="passcode-dots" id="c-dots"></div>
     <div class="pin-error" id="c-error"></div>
     <div class="pin-grid" id="c-grid"></div>
     <button class="btn-ghost mt1" onclick="go('s-forgot')">Forgot PIN?</button>
   </div>
 
-  <!-- ══ BIO LOGIN ══ -->
+  <!-- BIO LOGIN -->
   <div class="screen" id="s-bio-login">
-    <div class="app-header">
-      <button class="back-btn" onclick="go('s-caregiver-login')">&#8592;</button>
-      <div><div class="app-title">Caregiver Login</div><div class="app-subtitle">Step 2 of 2 — Confirm identity</div></div>
-    </div>
-    <div class="center" style="margin-top:1rem">
-      <div class="text-muted mb1">Place your finger on the sensor<br>or use Face ID</div>
-      <div class="bio-circle" id="bio-login-btn" onclick="loginBio()">&#128071;</div>
-      <div class="bio-status" id="bio-login-status">Tap to scan fingerprint</div>
-    </div>
+    <div class="app-header"><button class="back-btn" onclick="go('s-caregiver-login')">&#8592;</button><div><div class="app-title">Caregiver Login</div><div class="app-subtitle">Step 2 of 2 — Confirm identity</div></div></div>
+    <div class="bio-circle" id="bio-login-btn" onclick="loginBio()">&#128071;</div>
+    <div class="bio-status" id="bio-login-status">Tap to scan fingerprint</div>
     <hr class="div">
-    <button class="btn btn-outline btn-sm" onclick="loginBio()">&#128065; Use Face ID instead</button>
+    <button class="btn btn-outline" onclick="loginBio()">&#128065; Use Face ID instead</button>
   </div>
 
-  <!-- ══ FORGOT PIN ══ -->
+  <!-- FORGOT PIN -->
   <div class="screen" id="s-forgot">
-    <div class="app-header">
-      <button class="back-btn" onclick="go('s-home')">&#8592;</button>
-      <div><div class="app-title">Reset Your PIN</div></div>
-    </div>
+    <div class="app-header"><button class="back-btn" onclick="go('s-home')">&#8592;</button><div><div class="app-title">Reset Your PIN</div></div></div>
     <div class="notice">Confirm your name and date of birth to reset your PIN.</div>
-    <div class="form-group">
-      <label class="form-label">Your full name</label>
-      <input class="form-input" id="fo-name" placeholder="Jane Doe">
-    </div>
-    <div class="form-group">
-      <label class="form-label">Date of birth (MM/DD/YYYY)</label>
-      <input class="form-input" id="fo-dob" placeholder="03/14/1972">
-    </div>
+    <div class="form-group"><label class="form-label">Your full name</label><input class="form-input" id="fo-name" placeholder="Jane Doe"></div>
+    <div class="form-group"><label class="form-label">Date of birth (MM/DD/YYYY)</label><input class="form-input" id="fo-dob" placeholder="03/14/1972"></div>
     <div class="pin-error" id="fo-error"></div>
     <button class="btn btn-gold" onclick="verifyForgot()">Verify my identity</button>
     <button class="btn-ghost mt-half" onclick="go('s-home')">Cancel</button>
   </div>
 
-  <!-- ══ EMERGENCY DEMO (redirects to real page in production) ══ -->
+  <!-- EMERGENCY DEMO -->
   <div class="screen" id="s-emergency-demo">
-    <div class="app-header">
-      <button class="back-btn" onclick="go('s-home')">&#8592;</button>
-      <div><div class="app-title">Emergency View</div><div class="app-subtitle">What paramedics see when they scan the QR</div></div>
-    </div>
-    <div class="notice">&#128161; In production, scanning the QR code opens a public webpage — no app needed. This is a preview of that page.</div>
+    <div class="app-header"><button class="back-btn" onclick="go('s-home')">&#8592;</button><div><div class="app-title">Emergency View</div><div class="app-subtitle">What paramedics see when they scan the QR</div></div></div>
     <div id="em-preview"></div>
-    <hr class="div">
-    <div class="section-label">Your emergency URL</div>
-    <div class="url-box" id="em-url-box" style="display:none">
-      <span class="url-text" id="em-url-text"></span>
-      <button class="copy-btn" onclick="copyURL()">Copy</button>
-    </div>
-    <div class="notice" id="em-no-account" style="display:none">Sign in or create an account to get your personal emergency URL and QR code.</div>
-    <button class="btn btn-outline mt1" onclick="go('s-home')">&#8592; Back</button>
+    <div class="section-label mt1">Your emergency URL</div>
+    <div class="url-box" id="em-url-box" style="display:none"><span class="url-text" id="em-url-text"></span><button class="copy-btn" onclick="copyURL()">Copy</button></div>
+    <div class="notice" id="em-no-account">Sign in or create an account to get your personal emergency URL and QR code.</div>
+    <button class="btn btn-outline mt1" onclick="go('s-patient-portal')">&#8592; Back</button>
   </div>
 
-  <!-- ══ PATIENT PORTAL ══ -->
+  <!-- PATIENT PORTAL -->
   <div class="screen" id="s-patient-portal">
-    <div class="app-header">
-      <button class="back-btn" onclick="signOut()">&#8592;</button>
-      <div><div class="app-title">My Health Info</div><div class="app-subtitle">Saves automatically as you type</div></div>
+    <div class="app-header"><button class="back-btn" onclick="signOut()">&#8592;</button><div><div class="app-title">My Health Info</div><div class="app-subtitle" id="portal-greeting"></div></div></div>
+    <div class="portal-nav">
+      <div class="nav-card" onclick="go('s-basics')"><div class="nav-card-icon">&#128100;</div><div class="nav-card-label">Basic Info</div><div class="nav-card-sub">Name, DOB, blood type</div></div>
+      <div class="nav-card" onclick="go('s-medications')"><div class="nav-card-icon">&#128138;</div><div class="nav-card-label">Medications</div><div class="nav-card-sub">Meds, dose &amp; frequency</div></div>
+      <div class="nav-card" onclick="go('s-allergies')"><div class="nav-card-icon">&#9888;</div><div class="nav-card-label">Allergies</div><div class="nav-card-sub">Reactions &amp; severity</div></div>
+      <div class="nav-card" onclick="go('s-conditions')"><div class="nav-card-icon">&#10084;</div><div class="nav-card-label">Medical History</div><div class="nav-card-sub">Conditions &amp; surgeries</div></div>
+      <div class="nav-card" onclick="go('s-devices')"><div class="nav-card-icon">&#128268;</div><div class="nav-card-label">Implanted Devices</div><div class="nav-card-sub">Pacemakers, stents, etc.</div></div>
+      <div class="nav-card" onclick="go('s-directives')"><div class="nav-card-icon">&#128221;</div><div class="nav-card-label">Directives &amp; Legal</div><div class="nav-card-sub">Code status, POA, DNR</div></div>
+      <div class="nav-card" onclick="go('s-contacts')"><div class="nav-card-icon">&#128222;</div><div class="nav-card-label">Emergency Contacts</div><div class="nav-card-sub">Family &amp; doctors</div></div>
+      <div class="nav-card" onclick="go('s-emergency-demo')"><div class="nav-card-icon">&#128736;</div><div class="nav-card-label">Preview My Card</div><div class="nav-card-sub">What paramedics see</div></div>
     </div>
-    <div id="p-form"></div>
-    <button class="btn btn-gold mt1" onclick="savePortal('patient')">Done — save everything</button>
-    <button class="btn-ghost mt-half" onclick="signOut()">Sign out</button>
+    <button class="btn-ghost" onclick="signOut()">Sign out</button>
   </div>
 
-  <!-- ══ CAREGIVER PORTAL ══ -->
-  <div class="screen" id="s-caregiver-portal">
-    <div class="app-header">
-      <button class="back-btn" onclick="signOut()">&#8592;</button>
-      <div><div class="app-title">Care Records</div><div class="app-subtitle">Full caregiver access</div></div>
+  <!-- BASIC INFO -->
+  <div class="screen" id="s-basics">
+    <div class="app-header"><button class="back-btn" onclick="go('s-patient-portal')">&#8592;</button><div><div class="app-title">Basic Info</div><div class="app-subtitle">Saves automatically</div></div></div>
+    <div class="form-group"><label class="form-label">Your full name</label><input class="form-input" id="f-name" oninput="autosave('full_name',this.value)"></div>
+    <div class="form-group"><label class="form-label">Date of birth (MM/DD/YYYY)</label><input class="form-input" id="f-dob" placeholder="03/14/1972" oninput="autosave('dob',this.value)"></div>
+    <div class="form-group"><label class="form-label">Blood type</label>
+      <select class="form-select" id="f-blood" onchange="autosave('blood_type',this.value)">
+        <option value="">-- Select blood type --</option>
+        <option>A+</option><option>A-</option><option>B+</option><option>B-</option>
+        <option>AB+</option><option>AB-</option><option>O+</option><option>O-</option><option>Unknown</option>
+      </select>
     </div>
-    <div id="c-form"></div>
-    <button class="btn btn-dark mt1" onclick="savePortal('caregiver')">Done — save everything</button>
-    <button class="btn-ghost mt-half" onclick="signOut()">Sign out</button>
+    <div class="form-group"><label class="form-label">Weight (pounds)</label><input class="form-input" id="f-weight" placeholder="142" oninput="autosave('weight_lbs',this.value)"></div>
+    <div class="form-group"><label class="form-label">Height</label><input class="form-input" id="f-height" placeholder="5'6&quot;" oninput="autosave('height',this.value)"></div>
+    <div class="form-group"><label class="form-label">Primary language spoken</label>
+      <select class="form-select" id="f-language" onchange="autosave('language',this.value)">
+        <option value="">-- Select language --</option>
+        <option>English</option><option>Spanish</option><option>French</option><option>Mandarin</option>
+        <option>Arabic</option><option>Portuguese</option><option>Hindi</option><option>Other</option>
+      </select>
+    </div>
+    <button class="btn btn-gold mt1" onclick="go('s-patient-portal')">Done</button>
   </div>
 
-  <!-- ══ SAVED ══ -->
+  <!-- MEDICATIONS -->
+  <div class="screen" id="s-medications">
+    <div class="app-header"><button class="back-btn" onclick="go('s-patient-portal')">&#8592;</button><div><div class="app-title">Medications</div><div class="app-subtitle">Your current medications</div></div></div>
+    <div id="med-list"></div>
+    <button class="btn-add" onclick="go('s-add-med')">&#43; Add a medication</button>
+    <button class="btn btn-gold mt1" onclick="go('s-patient-portal')">Done</button>
+  </div>
+
+  <!-- ADD MEDICATION -->
+  <div class="screen" id="s-add-med">
+    <div class="app-header"><button class="back-btn" onclick="go('s-medications')">&#8592;</button><div><div class="app-title">Add Medication</div></div></div>
+    <div class="form-group"><label class="form-label">Choose a common medication</label>
+      <select class="form-select" id="med-name-select" onchange="medNameFromSelect(this.value)">
+        <option value="">-- Select or type below --</option>
+        <optgroup label="Heart &amp; Blood Pressure">
+          <option>Lisinopril</option><option>Metoprolol</option><option>Amlodipine</option><option>Losartan</option>
+          <option>Atorvastatin</option><option>Simvastatin</option><option>Carvedilol</option><option>Furosemide</option>
+          <option>Digoxin</option><option>Warfarin</option><option>Aspirin</option><option>Clopidogrel</option>
+        </optgroup>
+        <optgroup label="Diabetes">
+          <option>Metformin</option><option>Insulin (Glargine)</option><option>Insulin (Lispro)</option>
+          <option>Glipizide</option><option>Januvia</option><option>Ozempic</option><option>Jardiance</option>
+        </optgroup>
+        <optgroup label="Mental Health">
+          <option>Sertraline</option><option>Fluoxetine</option><option>Escitalopram</option>
+          <option>Bupropion</option><option>Quetiapine</option><option>Lorazepam</option><option>Alprazolam</option>
+        </optgroup>
+        <optgroup label="Pain &amp; Inflammation">
+          <option>Ibuprofen</option><option>Naproxen</option><option>Acetaminophen</option>
+          <option>Gabapentin</option><option>Tramadol</option><option>Oxycodone</option><option>Hydrocodone</option>
+        </optgroup>
+        <optgroup label="Respiratory">
+          <option>Albuterol</option><option>Fluticasone</option><option>Montelukast</option><option>Prednisone</option>
+        </optgroup>
+        <optgroup label="Thyroid &amp; Hormones">
+          <option>Levothyroxine</option><option>Estradiol</option><option>Testosterone</option>
+        </optgroup>
+        <optgroup label="Other Common">
+          <option>Amoxicillin</option><option>Azithromycin</option><option>Omeprazole</option>
+          <option>Pantoprazole</option><option>Vitamin D</option><option>Vitamin B12</option>
+        </optgroup>
+      </select>
+    </div>
+    <div class="form-group"><label class="form-label">Medication name (if not listed above)</label><input class="form-input" id="med-name-input" placeholder="Type medication name here"></div>
+    <div class="form-group"><label class="form-label">Dose — how much per dose</label><input class="form-input" id="med-dose" placeholder="e.g. 500mg, 10 units, 1 tablet"></div>
+    <div class="form-group"><label class="form-label">How often do you take it?</label>
+      <select class="form-select" id="med-freq">
+        <option value="">-- Select frequency --</option>
+        <option>Once daily</option><option>Twice daily</option><option>Three times daily</option>
+        <option>Four times daily</option><option>Every morning</option><option>Every night at bedtime</option>
+        <option>Every other day</option><option>Once weekly</option><option>As needed</option>
+        <option>With meals</option><option>By injection — daily</option><option>By injection — weekly</option>
+      </select>
+    </div>
+    <div class="form-group"><label class="form-label">What is it for? (optional)</label><input class="form-input" id="med-reason" placeholder="e.g. Blood pressure, diabetes, pain"></div>
+    <div class="form-error" id="med-error"></div>
+    <button class="btn btn-gold" onclick="saveMed()">Save this medication</button>
+    <button class="btn-ghost mt-half" onclick="go('s-medications')">Cancel</button>
+  </div>
+
+  <!-- ALLERGIES -->
+  <div class="screen" id="s-allergies">
+    <div class="app-header"><button class="back-btn" onclick="go('s-patient-portal')">&#8592;</button><div><div class="app-title">Allergies</div><div class="app-subtitle">Your known allergies</div></div></div>
+    <div id="allergy-list"></div>
+    <button class="btn-add" onclick="go('s-add-allergy')">&#43; Add an allergy</button>
+    <button class="btn btn-gold mt1" onclick="go('s-patient-portal')">Done</button>
+  </div>
+
+  <!-- ADD ALLERGY -->
+  <div class="screen" id="s-add-allergy">
+    <div class="app-header"><button class="back-btn" onclick="go('s-allergies')">&#8592;</button><div><div class="app-title">Add Allergy</div></div></div>
+    <div class="form-group"><label class="form-label">What are you allergic to?</label>
+      <select class="form-select" id="allergy-name-select" onchange="allergyNameFromSelect(this.value)">
+        <option value="">-- Select or type below --</option>
+        <optgroup label="Medications">
+          <option>Penicillin</option><option>Amoxicillin</option><option>Sulfa drugs</option>
+          <option>Aspirin</option><option>Ibuprofen</option><option>Codeine</option>
+          <option>Morphine</option><option>Contrast dye (iodine)</option><option>Vancomycin</option>
+        </optgroup>
+        <optgroup label="Food">
+          <option>Peanuts</option><option>Tree nuts</option><option>Shellfish</option><option>Fish</option>
+          <option>Milk / Dairy</option><option>Eggs</option><option>Soy</option><option>Wheat / Gluten</option><option>Sesame</option>
+        </optgroup>
+        <optgroup label="Environmental">
+          <option>Latex</option><option>Bee stings</option><option>Dust mites</option>
+          <option>Pet dander</option><option>Pollen</option><option>Mold</option>
+        </optgroup>
+      </select>
+    </div>
+    <div class="form-group"><label class="form-label">Allergy name (if not listed above)</label><input class="form-input" id="allergy-name-input" placeholder="Type allergy name here"></div>
+    <div class="form-group"><label class="form-label">What reaction do you have?</label>
+      <select class="form-select" id="allergy-reaction">
+        <option value="">-- Select your reaction --</option>
+        <option>Hives / skin rash</option>
+        <option>Swelling of face or throat</option>
+        <option>Anaphylaxis — throat closes, trouble breathing</option>
+        <option>Nausea / vomiting</option>
+        <option>Stomach pain / cramping</option>
+        <option>Difficulty breathing / wheezing</option>
+        <option>Itching</option>
+        <option>Headache / dizziness</option>
+        <option>Low blood pressure / fainting</option>
+        <option>Other</option>
+      </select>
+    </div>
+    <div class="form-group"><label class="form-label">How severe is this allergy?</label>
+      <div class="radio-group" id="severity-group">
+        <button class="radio-btn" onclick="selectSeverity('Mild')">Mild</button>
+        <button class="radio-btn" onclick="selectSeverity('Moderate')">Moderate</button>
+        <button class="radio-btn" onclick="selectSeverity('Severe')">Severe</button>
+        <button class="radio-btn" onclick="selectSeverity('Life-threatening')">Life-threatening</button>
+      </div>
+    </div>
+    <div class="form-error" id="allergy-error"></div>
+    <button class="btn btn-gold" onclick="saveAllergy()">Save this allergy</button>
+    <button class="btn-ghost mt-half" onclick="go('s-allergies')">Cancel</button>
+  </div>
+
+  <!-- MEDICAL HISTORY -->
+  <div class="screen" id="s-conditions">
+    <div class="app-header"><button class="back-btn" onclick="go('s-patient-portal')">&#8592;</button><div><div class="app-title">Medical History</div><div class="app-subtitle">Saves automatically</div></div></div>
+    <div class="section-label">Current health conditions</div>
+    <div class="notice" style="margin-bottom:0.75rem">Check all that apply to you</div>
+    <div id="conditions-checkboxes" style="margin-bottom:1rem"></div>
+    <div class="form-group"><label class="form-label">Any other conditions not listed above?</label><input class="form-input" id="f-conditions-other" placeholder="Type here" oninput="autosave('conditions_other',this.value)"></div>
+    <hr class="div">
+    <div class="section-label">Past surgical history</div>
+    <div class="form-group"><label class="form-label">List any surgeries you have had and roughly when</label><textarea class="form-textarea" id="f-surgery" placeholder="e.g. Appendectomy 2008, Hip replacement 2019" oninput="autosave('surgery_history',this.value)"></textarea></div>
+    <button class="btn btn-gold mt1" onclick="go('s-patient-portal')">Done</button>
+  </div>
+
+  <!-- IMPLANTED DEVICES -->
+  <div class="screen" id="s-devices">
+    <div class="app-header"><button class="back-btn" onclick="go('s-patient-portal')">&#8592;</button><div><div class="app-title">Implanted Devices</div><div class="app-subtitle">Important for MRI and emergency care</div></div></div>
+    <div id="device-list"></div>
+    <button class="btn-add" onclick="go('s-add-device')">&#43; Add an implanted device</button>
+    <button class="btn btn-gold mt1" onclick="go('s-patient-portal')">Done</button>
+  </div>
+
+  <!-- ADD DEVICE -->
+  <div class="screen" id="s-add-device">
+    <div class="app-header"><button class="back-btn" onclick="go('s-devices')">&#8592;</button><div><div class="app-title">Add Implanted Device</div></div></div>
+    <div class="form-group"><label class="form-label">Type of device</label>
+      <select class="form-select" id="device-type-select" onchange="deviceFromSelect(this.value)">
+        <option value="">-- Select device type --</option>
+        <option>Pacemaker</option><option>Implantable Cardioverter Defibrillator (ICD)</option>
+        <option>Coronary stent</option><option>Artificial heart valve</option>
+        <option>Cochlear implant</option><option>Spinal cord stimulator</option>
+        <option>Deep brain stimulator</option><option>Insulin pump</option>
+        <option>Continuous glucose monitor (CGM)</option><option>Joint replacement — hip</option>
+        <option>Joint replacement — knee</option><option>Metal plate or screws</option>
+        <option>Vascular graft</option><option>Port-a-cath</option><option>Neurostimulator</option>
+        <option>Other (type below)</option>
+      </select>
+    </div>
+    <div class="form-group"><label class="form-label">Device name (if not listed above)</label><input class="form-input" id="device-name-input" placeholder="Type device name here"></div>
+    <div class="form-group"><label class="form-label">Year implanted (optional)</label><input class="form-input" id="device-year" placeholder="e.g. 2019"></div>
+    <div class="form-group"><label class="form-label">Brand or model (optional)</label><input class="form-input" id="device-brand" placeholder="e.g. Medtronic Azure XT"></div>
+    <div class="form-error" id="device-error"></div>
+    <button class="btn btn-gold" onclick="saveDevice()">Save this device</button>
+    <button class="btn-ghost mt-half" onclick="go('s-devices')">Cancel</button>
+  </div>
+
+  <!-- DIRECTIVES & LEGAL -->
+  <div class="screen" id="s-directives">
+    <div class="app-header"><button class="back-btn" onclick="go('s-patient-portal')">&#8592;</button><div><div class="app-title">Directives &amp; Legal</div><div class="app-subtitle">Saves automatically</div></div></div>
+    <div class="section-label">Code status</div>
+    <div class="form-group">
+      <label class="form-label">What is your code status? <span style="font-size:12px;color:#185FA5;cursor:pointer" onclick="toggleCodeInfo()">&#9432; What do these mean?</span></label>
+      <select class="form-select" id="f-code-status" onchange="autosave('code_status',this.value);showCodeDef(this.value)">
+        <option value="">-- Select your code status --</option>
+        <option value="Full Code">Full Code</option>
+        <option value="DNR">DNR — Do Not Resuscitate</option>
+        <option value="DNI">DNI — Do Not Intubate</option>
+        <option value="DNR/DNI">DNR/DNI — Do Not Resuscitate or Intubate</option>
+        <option value="Comfort Care">Comfort Care only</option>
+      </select>
+      <div class="definition-box" id="code-def"></div>
+    </div>
+    <hr class="div">
+    <div class="section-label">Blood &amp; organ donation</div>
+    <div class="form-group"><label class="form-label">Do you consent to receiving blood transfusions?</label>
+      <div class="radio-group" id="transfusion-group">
+        <button class="radio-btn" onclick="selectRadio('transfusion-group','Yes');autosave('blood_transfusion','Yes')">Yes</button>
+        <button class="radio-btn" onclick="selectRadio('transfusion-group','No');autosave('blood_transfusion','No')">No</button>
+        <button class="radio-btn" onclick="selectRadio('transfusion-group','Certain types only');autosave('blood_transfusion','Certain types only')">Certain types only</button>
+      </div>
+    </div>
+    <div class="form-group"><label class="form-label">Are you an organ donor?</label>
+      <div class="radio-group" id="donor-group">
+        <button class="radio-btn" onclick="selectRadio('donor-group','Yes');autosave('organ_donor','Yes')">Yes</button>
+        <button class="radio-btn" onclick="selectRadio('donor-group','No');autosave('organ_donor','No')">No</button>
+      </div>
+    </div>
+    <hr class="div">
+    <div class="section-label">Legal documents</div>
+    <div class="form-group"><label class="form-label">Do you have a Living Will?</label>
+      <div class="radio-group" id="living-will-group">
+        <button class="radio-btn" onclick="selectRadio('living-will-group','Yes');autosave('living_will','Yes')">Yes</button>
+        <button class="radio-btn" onclick="selectRadio('living-will-group','No');autosave('living_will','No')">No</button>
+      </div>
+    </div>
+    <div class="form-group"><label class="form-label">Do you have a Power of Attorney (POA)?</label>
+      <div class="radio-group" id="poa-group">
+        <button class="radio-btn" onclick="selectRadio('poa-group','Yes');autosave('has_poa','Yes');toggleSection('poa-section',true)">Yes</button>
+        <button class="radio-btn" onclick="selectRadio('poa-group','No');autosave('has_poa','No');toggleSection('poa-section',false)">No</button>
+      </div>
+    </div>
+    <div id="poa-section" style="display:none" class="poa-indent">
+      <div class="form-group"><label class="form-label">POA full name</label><input class="form-input" id="f-poa-name" placeholder="Full name" oninput="autosave('poa_name',this.value)"></div>
+      <div class="form-group"><label class="form-label">POA phone number</label><input class="form-input" id="f-poa-phone" placeholder="704-555-0100" oninput="autosave('poa_phone',this.value)"></div>
+      <div class="form-group"><label class="form-label">POA address</label><input class="form-input" id="f-poa-address" placeholder="123 Main St, City, State" oninput="autosave('poa_address',this.value)"></div>
+    </div>
+    <div class="form-group"><label class="form-label">Do you have a Mental Health Power of Attorney?</label>
+      <div class="radio-group" id="mhpoa-group">
+        <button class="radio-btn" onclick="selectRadio('mhpoa-group','Yes');autosave('has_mhpoa','Yes');toggleSection('mhpoa-section',true)">Yes</button>
+        <button class="radio-btn" onclick="selectRadio('mhpoa-group','No');autosave('has_mhpoa','No');toggleSection('mhpoa-section',false)">No</button>
+      </div>
+    </div>
+    <div id="mhpoa-section" style="display:none" class="poa-indent">
+      <div class="form-group"><label class="form-label">Mental Health POA full name</label><input class="form-input" id="f-mhpoa-name" placeholder="Full name" oninput="autosave('mhpoa_name',this.value)"></div>
+      <div class="form-group"><label class="form-label">Mental Health POA phone number</label><input class="form-input" id="f-mhpoa-phone" placeholder="704-555-0100" oninput="autosave('mhpoa_phone',this.value)"></div>
+      <div class="form-group"><label class="form-label">Mental Health POA address</label><input class="form-input" id="f-mhpoa-address" placeholder="123 Main St, City, State" oninput="autosave('mhpoa_address',this.value)"></div>
+    </div>
+    <button class="btn btn-gold mt1" onclick="go('s-patient-portal')">Done</button>
+  </div>
+
+  <!-- EMERGENCY CONTACTS -->
+  <div class="screen" id="s-contacts">
+    <div class="app-header"><button class="back-btn" onclick="go('s-patient-portal')">&#8592;</button><div><div class="app-title">Emergency Contacts</div><div class="app-subtitle">Saves automatically</div></div></div>
+    <div class="section-label">Primary emergency contact</div>
+    <div class="form-group"><label class="form-label">Name and their relationship to you</label><input class="form-input" id="f-ec1-name" placeholder="e.g. Robert Doe (husband)" oninput="autosave('ec1_name',this.value)"></div>
+    <div class="form-group"><label class="form-label">Phone number</label><input class="form-input" id="f-ec1-phone" placeholder="704-555-0192" oninput="autosave('ec1_phone',this.value)"></div>
+    <hr class="div">
+    <div class="section-label">Secondary emergency contact</div>
+    <div class="form-group"><label class="form-label">Name and their relationship to you</label><input class="form-input" id="f-ec2-name" placeholder="e.g. Sarah Doe (daughter)" oninput="autosave('ec2_name',this.value)"></div>
+    <div class="form-group"><label class="form-label">Phone number</label><input class="form-input" id="f-ec2-phone" placeholder="704-555-0193" oninput="autosave('ec2_phone',this.value)"></div>
+    <hr class="div">
+    <div class="section-label">Your doctor</div>
+    <div class="form-group"><label class="form-label">Doctor's name</label><input class="form-input" id="f-dr-name" placeholder="Dr. Sarah Kim" oninput="autosave('doctor_name',this.value)"></div>
+    <div class="form-group"><label class="form-label">Doctor's phone number</label><input class="form-input" id="f-dr-phone" placeholder="704-555-0148" oninput="autosave('doctor_phone',this.value)"></div>
+    <div class="form-group"><label class="form-label">Doctor's office or hospital name</label><input class="form-input" id="f-dr-office" placeholder="e.g. Atrium Health Charlotte" oninput="autosave('doctor_office',this.value)"></div>
+    <button class="btn btn-gold mt1" onclick="go('s-patient-portal')">Done</button>
+  </div>
+
+  <!-- SAVED -->
   <div class="screen" id="s-saved">
     <div class="success-icon">&#10003;</div>
     <div class="center" style="font-size:18px;font-weight:bold;color:#2E7D32;margin-bottom:0.5rem">All saved!</div>
     <div class="center text-muted mb1">Your emergency info is up to date.</div>
-    <div class="success-box">&#128274; Saved securely. Emergency staff can always access your critical info via QR code.</div>
-    <button class="btn btn-gold mt1" onclick="go('s-home')">Back to home</button>
+    <div class="success-box">&#128274; Saved securely. Emergency staff can access your info via QR code anytime.</div>
+    <button class="btn btn-gold mt1" onclick="go('s-patient-portal')">Back to my card</button>
   </div>
 
-</div><!-- /app -->
+</div>
 
 <script>
-// ─── CONFIG ───────────────────────────────────────────
 const SUPABASE_URL = 'https://ehtawogwkhqemctdtzcg.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVodGF3b2d3a2hxZW1jdGR0emNnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY2NTY5NTcsImV4cCI6MjA5MjIzMjk1N30.3ZU-0LU4W6-Q31WbaCbfDCL7AeHtAUjRq5908MsgJpo';
 const BASE_URL = 'https://med-card-app-oobx.vercel.app';
-// ──────────────────────────────────────────────────────
-
 const { createClient } = supabase;
 const db = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-
-// ── STATE ──
-let currentUser = null;   // Supabase auth user
-let patientRecord = null; // DB row for this patient
-let setupFor = null;      // 'patient' | 'caregiver'
-
-// ── SCREENS ──
-const SCREENS = ['s-home','s-signup','s-login','s-setup-pin','s-bio-setup','s-card-option','s-patient-login','s-caregiver-login','s-bio-login','s-forgot','s-emergency-demo','s-patient-portal','s-caregiver-portal','s-saved'];
-function go(id) {
-  SCREENS.forEach(s => { const el=document.getElementById(s); if(el) el.classList.remove('active'); });
-  const t = document.getElementById(id); if(t) t.classList.add('active');
-  if(id==='s-patient-portal') buildForm('patient');
-  if(id==='s-caregiver-portal') buildForm('caregiver');
-  if(id==='s-emergency-demo') buildEmergencyPreview();
-  if(id==='s-card-option') updateCardOption();
-  updateHomeCard();
-}
-
-// ── QR PATTERN ──
-const QR = [0,1,1,0,1,1,0,1,0,1,0,1,0,1,0,1,1,0,1,1,0,1,0,0,0,1,0,0,0,0,1,0,1,0,0,0,0,0,0,1,0,1,0,1,1,0,1,0,0];
-function buildQR(id) { const el=document.getElementById(id); if(!el)return; el.innerHTML=''; QR.forEach(v=>{const d=document.createElement('div');d.className='qr-cell'+(v?'':' w');el.appendChild(d);}); }
-
-function emergencyURL() { return patientRecord ? `${BASE_URL}/${patientRecord.card_slug}` : ''; }
-
-function updateHomeCard() {
-  const nameEl=document.getElementById('home-name');
-  const idEl=document.getElementById('home-id');
-  const urlEl=document.getElementById('home-url');
-  if(patientRecord) {
-    if(nameEl) nameEl.textContent = patientRecord.full_name || 'Your Name';
-    if(idEl) idEl.textContent = 'ID: ' + (patientRecord.card_id || '');
-    if(urlEl) urlEl.textContent = emergencyURL();
-  } else {
-    if(nameEl) nameEl.textContent = 'Your Medical Card';
-    if(idEl) idEl.textContent = 'Sign in to activate';
-    if(urlEl) urlEl.textContent = 'Create an account to get your QR code';
-  }
-}
-
-function updateCardOption() {
-  if(!patientRecord) return;
-  buildQR('qr-co');
-  const n=document.getElementById('co-name'); if(n) n.textContent=patientRecord.full_name||'';
-  const i=document.getElementById('co-id'); if(i) i.textContent='ID: '+(patientRecord.card_id||'');
-  const u=document.getElementById('co-url'); if(u) u.textContent=emergencyURL();
-}
-
-// ── AUTH: SIGN UP ──
-async function signup() {
-  const name=document.getElementById('su-name').value.trim();
-  const dob=document.getElementById('su-dob').value.trim();
-  const email=document.getElementById('su-email').value.trim();
-  const pass=document.getElementById('su-password').value;
-  const errEl=document.getElementById('su-error');
-  const btn=document.getElementById('su-btn');
-
-  if(!name||!dob||!email||!pass) { errEl.textContent='Please fill in all fields.'; return; }
-  if(pass.length<8) { errEl.textContent='Password must be at least 8 characters.'; return; }
-  errEl.textContent='';
-  btn.innerHTML='<span class="spinner"></span>Creating your card...';
-  btn.disabled=true;
-
-  const { data, error } = await db.auth.signUp({ email, password: pass });
-  if(error) { errEl.textContent=error.message; btn.textContent='Create my MedCard'; btn.disabled=false; return; }
-
-  currentUser = data.user;
-
-  // Generate unique card ID and slug
-  const slug = Math.random().toString(36).substring(2,8) + Date.now().toString(36);
-  const cardId = 'MC-' + new Date().getFullYear() + '-' + String(Math.floor(Math.random()*90000)+10000);
-
-  // Insert patient row
-  const { data: row, error: dbErr } = await db.from('patients').insert({
-    id: currentUser.id,
-    email, full_name: name, dob,
-    card_id: cardId, card_slug: slug
-  }).select().single();
-
-  if(dbErr) { errEl.textContent='Account created but profile setup failed. Please sign in.'; btn.textContent='Create my MedCard'; btn.disabled=false; return; }
-
-  patientRecord = row;
-  setupFor = 'patient';
-  btn.textContent='Create my MedCard'; btn.disabled=false;
-  go('s-setup-pin');
-  document.getElementById('setup-title').textContent='Set your Patient PIN';
-  document.getElementById('setup-sub').textContent='You\'ll use this to log in and update your info';
-}
-
-// ── AUTH: LOGIN ──
-async function login() {
-  const email=document.getElementById('li-email').value.trim();
-  const pass=document.getElementById('li-password').value;
-  const errEl=document.getElementById('li-error');
-  const btn=document.getElementById('li-btn');
-
-  if(!email||!pass) { errEl.textContent='Please enter your email and password.'; return; }
-  errEl.textContent='';
-  btn.innerHTML='<span class="spinner"></span>Signing in...';
-  btn.disabled=true;
-
-  const { data, error } = await db.auth.signInWithPassword({ email, password: pass });
-  if(error) { errEl.textContent='Email or password is incorrect.'; btn.textContent='Sign in'; btn.disabled=false; return; }
-
-  currentUser = data.user;
-  await loadPatientRecord();
-  btn.textContent='Sign in'; btn.disabled=false;
-
-  if(!patientRecord?.patient_pin) {
-    setupFor='patient'; go('s-setup-pin');
-    document.getElementById('setup-title').textContent='Set your Patient PIN';
-    document.getElementById('setup-sub').textContent='Choose a PIN to protect your health info';
-  } else {
-    go('s-patient-portal');
-  }
-}
-
-async function loadPatientRecord() {
-  if(!currentUser) return;
-  const { data } = await db.from('patients').select('*').eq('id', currentUser.id).single();
-  patientRecord = data;
-  buildQR('qr-home');
-  updateHomeCard();
-}
-
-async function signOut() {
-  await db.auth.signOut();
-  currentUser=null; patientRecord=null;
-  go('s-home');
-}
-
-// ── PIN SETUP ──
-let setupStep='enter', setupFirst='', setupCurrent='';
-function renderSetupDots() { const el=document.getElementById('setup-dots'); if(!el)return; el.innerHTML=''; for(let i=0;i<4;i++){const d=document.createElement('div');d.className='dot'+(i<setupCurrent.length?' filled':'');el.appendChild(d);} }
-function resetSetupPin() { setupCurrent=''; renderSetupDots(); document.getElementById('setup-error').textContent=''; }
-function updateSetupLabels() {
-  document.getElementById('setup-step-label').textContent = setupStep==='enter'?'Choose a 4-digit PIN':'Enter the same PIN again to confirm';
-  document.getElementById('setup-hint').textContent = setupStep==='confirm'?'Must match what you just entered':'';
-}
-function buildSetupGrid() {
-  const g=document.getElementById('setup-grid'); if(!g)return; g.innerHTML='';
-  [1,2,3,4,5,6,7,8,9,'',0,'del'].forEach(v=>{
-    const b=document.createElement('button'); b.className='pin-btn'+(v==='del'?' del':'');
-    b.textContent=v==='del'?'⌫':v===''?'':v;
-    if(v!=='') b.onclick=()=>pressSetupPin(String(v));
-    g.appendChild(b);
-  });
-  setupStep='enter'; setupFirst=''; resetSetupPin(); updateSetupLabels();
-}
-function pressSetupPin(v) {
-  if(v==='del'){setupCurrent=setupCurrent.slice(0,-1);renderSetupDots();return;}
-  if(setupCurrent.length>=4)return;
-  setupCurrent+=v; renderSetupDots();
-  if(setupCurrent.length===4) checkSetupPin();
-}
-async function checkSetupPin() {
-  if(setupStep==='enter') { setupFirst=setupCurrent; setupStep='confirm'; resetSetupPin(); updateSetupLabels(); }
-  else {
-    if(setupCurrent===setupFirst) {
-      // Save PIN to DB
-      const col = setupFor==='patient'?'patient_pin':'caregiver_pin';
-      await db.from('patients').update({ [col]: setupFirst }).eq('id', currentUser.id);
-      await loadPatientRecord();
-      if(setupFor==='caregiver') go('s-bio-setup');
-      else go('s-card-option');
-    } else {
-      document.getElementById('setup-error').textContent="PINs don't match — try again";
-      setupStep='enter'; setupFirst='';
-      setTimeout(()=>{ resetSetupPin(); updateSetupLabels(); document.getElementById('setup-error').textContent=''; },1000);
-    }
-  }
-}
-
-// ── BIO SETUP ──
-function registerBio() {
-  const btn=document.getElementById('bio-setup-btn'), st=document.getElementById('bio-setup-status');
-  btn.classList.add('scanning'); st.textContent='Scanning...';
-  setTimeout(async ()=>{
-    btn.classList.remove('scanning'); st.textContent='Biometric registered!';
-    await db.from('patients').update({ bio_registered: true }).eq('id', currentUser.id);
-    await loadPatientRecord();
-    setTimeout(()=>go('s-card-option'),600);
-  },1600);
-}
-function skipBio() { go('s-card-option'); }
-
-// ── CARD OPTION ──
-async function handleCardOption() {
-  const sel=document.querySelector('input[name="card-opt"]:checked');
-  const choice=sel?sel.value:'skip';
-  await db.from('patients').update({ card_choice: choice }).eq('id', currentUser.id);
-  if(choice==='print') printCard();
-  else if(choice==='order') alert('Order by mail is coming soon! We\'ll notify you when available.');
-  go('s-patient-portal');
-}
-function printCard() {
-  if(!patientRecord) return;
-  const url=emergencyURL();
-  const w=window.open('','_blank','width=640,height=440');
-  if(!w) return;
-  w.document.write(`<!DOCTYPE html><html><head><title>MedCard — ${patientRecord.full_name}</title><style>body{font-family:Georgia,serif;background:#f5d060;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0;flex-direction:column;gap:20px}.card{background:linear-gradient(135deg,#F5D060,#C9A84C,#E8C060,#A07828);border-radius:18px;padding:24px 28px;width:340px;box-shadow:0 6px 24px rgba(0,0,0,0.2)}.logo{font-size:11px;font-weight:bold;color:#6B4A00;letter-spacing:0.06em;margin-bottom:10px}.name{font-size:20px;font-weight:bold;color:#3A2800;margin-bottom:3px}.id{font-size:11px;color:#6B4A00;margin-bottom:16px}.footer{display:flex;justify-content:space-between;align-items:flex-end}.qr-placeholder{width:70px;height:70px;background:#fff;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:9px;color:#888;text-align:center;padding:4px}.cross{font-size:26px;color:#8B0000;opacity:.85}.url-tag{font-size:9px;color:#6B4A00;text-align:right;line-height:1.5;word-break:break-all;max-width:170px}.hint{background:#fff;border-radius:10px;padding:10px 16px;font-size:12px;color:#666;max-width:340px;text-align:center}@media print{body{background:#f5d060}.hint{display:none}}</style></head><body><div class="card"><div class="logo">&#10010; MedCard</div><div class="name">${patientRecord.full_name}</div><div class="id">ID: ${patientRecord.card_id}</div><div class="footer"><div class="qr-placeholder">QR code<br>(add with<br>QR generator)</div><div><div class="cross">&#10010;</div><div class="url-tag">${url}</div></div></div></div><div class="hint">&#128161; To add a real QR code, paste your emergency URL into a free QR generator (like qr-code-generator.com), download the image, and print this page with the QR pasted in.</div><script>window.print();<\/script></body></html>`);
-}
-
-// ── LOGIN PINS ──
+let currentUser=null,patientRecord=null,setupFor=null,selectedSeverity='';
+const SCREENS=['s-home','s-signup','s-login','s-setup-pin','s-bio-setup','s-card-option','s-patient-login','s-caregiver-login','s-bio-login','s-forgot','s-emergency-demo','s-patient-portal','s-basics','s-medications','s-add-med','s-allergies','s-add-allergy','s-conditions','s-devices','s-add-device','s-directives','s-contacts','s-saved'];
+function go(id){SCREENS.forEach(s=>{const el=document.getElementById(s);if(el)el.classList.remove('active');});const t=document.getElementById(id);if(t)t.classList.add('active');if(id==='s-patient-portal')loadPortalGreeting();if(id==='s-basics')loadBasics();if(id==='s-medications')renderMeds();if(id==='s-allergies')renderAllergies();if(id==='s-conditions')loadConditions();if(id==='s-devices')renderDevices();if(id==='s-directives')loadDirectives();if(id==='s-contacts')loadContacts();if(id==='s-emergency-demo')buildEmergencyPreview();if(id==='s-card-option')updateCardOption();if(id==='s-add-med')resetAddMed();if(id==='s-add-allergy')resetAddAllergy();if(id==='s-add-device')resetAddDevice();updateHomeCard();}
+function generateQR(canvasId,url){if(!url)return;const canvas=document.getElementById(canvasId);if(!canvas)return;QRCode.toCanvas(canvas,url,{width:64,margin:0,color:{dark:'#000000',light:'#ffffff'}},()=>{});}
+function emergencyURL(){return patientRecord?`${BASE_URL}/${patientRecord.card_slug}`:'';} 
+function updateHomeCard(){if(patientRecord){const n=document.getElementById('home-name');if(n)n.textContent=patientRecord.full_name||'Your Name';const i=document.getElementById('home-id');if(i)i.textContent='ID: '+(patientRecord.card_id||'');setTimeout(()=>generateQR('home-qr-canvas',emergencyURL()),100);}}
+function updateCardOption(){if(!patientRecord)return;const n=document.getElementById('co-name');if(n)n.textContent=patientRecord.full_name||'';const i=document.getElementById('co-id');if(i)i.textContent='ID: '+(patientRecord.card_id||'');setTimeout(()=>generateQR('co-qr-canvas',emergencyURL()),100);}
+async function signup(){const name=document.getElementById('su-name').value.trim(),dob=document.getElementById('su-dob').value.trim(),email=document.getElementById('su-email').value.trim(),pass=document.getElementById('su-password').value,errEl=document.getElementById('su-error'),btn=document.getElementById('su-btn');if(!name||!dob||!email||!pass){errEl.textContent='Please fill in all fields.';return;}if(pass.length<8){errEl.textContent='Password must be at least 8 characters.';return;}errEl.textContent='';btn.innerHTML='<span class="spinner"></span>Creating your card...';btn.disabled=true;const{data,error}=await db.auth.signUp({email,password:pass});if(error){errEl.textContent=error.message;btn.textContent='Create my MedCard';btn.disabled=false;return;}currentUser=data.user;const slug=Math.random().toString(36).substring(2,8)+Date.now().toString(36),cardId='MC-'+new Date().getFullYear()+'-'+String(Math.floor(Math.random()*90000)+10000);const{data:row,error:dbErr}=await db.from('patients').insert({id:currentUser.id,email,full_name:name,dob,card_id:cardId,card_slug:slug}).select().single();if(dbErr){errEl.textContent='Profile setup failed: '+dbErr.message;btn.textContent='Create my MedCard';btn.disabled=false;return;}patientRecord=row;setupFor='patient';btn.textContent='Create my MedCard';btn.disabled=false;buildSetupGrid();go('s-setup-pin');document.getElementById('setup-title').textContent='Set your Patient PIN';document.getElementById('setup-sub').textContent="You'll use this to log in and update your info";}
+async function login(){const email=document.getElementById('li-email').value.trim(),pass=document.getElementById('li-password').value,errEl=document.getElementById('li-error'),btn=document.getElementById('li-btn');if(!email||!pass){errEl.textContent='Please enter your email and password.';return;}errEl.textContent='';btn.innerHTML='<span class="spinner"></span>Signing in...';btn.disabled=true;const{data,error}=await db.auth.signInWithPassword({email,password:pass});if(error){errEl.textContent='Email or password is incorrect.';btn.textContent='Sign in';btn.disabled=false;return;}currentUser=data.user;await loadPatientRecord();btn.textContent='Sign in';btn.disabled=false;if(!patientRecord?.patient_pin){setupFor='patient';buildSetupGrid();go('s-setup-pin');document.getElementById('setup-title').textContent='Set your Patient PIN';document.getElementById('setup-sub').textContent='Choose a PIN to protect your health info';}else{go('s-patient-portal');}}
+async function loadPatientRecord(){if(!currentUser)return;const{data}=await db.from('patients').select('*').eq('id',currentUser.id).single();patientRecord=data;if(patientRecord){if(!patientRecord.medications_json)patientRecord.medications_json=[];if(!patientRecord.allergies_json)patientRecord.allergies_json=[];if(!patientRecord.devices)patientRecord.devices=[];if(!patientRecord.conditions_list)patientRecord.conditions_list=[];}updateHomeCard();}
+async function signOut(){await db.auth.signOut();currentUser=null;patientRecord=null;go('s-home');}
+let setupStep='enter',setupFirst='',setupCurrent='';
+function renderSetupDots(){const el=document.getElementById('setup-dots');if(!el)return;el.innerHTML='';for(let i=0;i<4;i++){const d=document.createElement('div');d.className='dot'+(i<setupCurrent.length?' filled':'');el.appendChild(d);}}
+function resetSetupPin(){setupCurrent='';renderSetupDots();document.getElementById('setup-error').textContent='';}
+function updateSetupLabels(){document.getElementById('setup-step-label').textContent=setupStep==='enter'?'Choose a 4-digit PIN':'Enter the same PIN again to confirm';document.getElementById('setup-hint').textContent=setupStep==='confirm'?'Must match what you just entered':'';}
+function buildSetupGrid(){const g=document.getElementById('setup-grid');if(!g)return;g.innerHTML='';[1,2,3,4,5,6,7,8,9,'',0,'del'].forEach(v=>{const b=document.createElement('button');b.className='pin-btn'+(v==='del'?' del':'');b.textContent=v==='del'?'⌫':v===''?'':v;if(v!=='')b.onclick=()=>pressSetupPin(String(v));g.appendChild(b);});setupStep='enter';setupFirst='';resetSetupPin();updateSetupLabels();}
+function pressSetupPin(v){if(v==='del'){setupCurrent=setupCurrent.slice(0,-1);renderSetupDots();return;}if(setupCurrent.length>=4)return;setupCurrent+=v;renderSetupDots();if(setupCurrent.length===4)checkSetupPin();}
+async function checkSetupPin(){if(setupStep==='enter'){setupFirst=setupCurrent;setupStep='confirm';resetSetupPin();updateSetupLabels();}else{if(setupCurrent===setupFirst){const col=setupFor==='patient'?'patient_pin':'caregiver_pin';await db.from('patients').update({[col]:setupFirst}).eq('id',currentUser.id);await loadPatientRecord();if(setupFor==='caregiver')go('s-bio-setup');else go('s-card-option');}else{document.getElementById('setup-error').textContent="PINs don't match — try again";setupStep='enter';setupFirst='';setTimeout(()=>{resetSetupPin();updateSetupLabels();document.getElementById('setup-error').textContent='';},1000);}}}
+function registerBio(){const btn=document.getElementById('bio-setup-btn'),st=document.getElementById('bio-setup-status');btn.classList.add('scanning');st.textContent='Scanning...';setTimeout(async()=>{btn.classList.remove('scanning');st.textContent='Biometric registered!';await db.from('patients').update({bio_registered:true}).eq('id',currentUser.id);await loadPatientRecord();setTimeout(()=>go('s-card-option'),600);},1600);}
+function skipBio(){go('s-card-option');}
+function loginBio(){const btn=document.getElementById('bio-login-btn'),st=document.getElementById('bio-login-status');btn.classList.add('scanning');st.textContent='Scanning...';setTimeout(()=>{btn.classList.remove('scanning');st.textContent='Identity confirmed';setTimeout(()=>go('s-patient-portal'),500);},1500);}
+async function handleCardOption(){const sel=document.querySelector('input[name="card-opt"]:checked'),choice=sel?sel.value:'skip';await db.from('patients').update({card_choice:choice}).eq('id',currentUser.id);if(choice==='print')printCard();else if(choice==='order')alert('Order by mail coming soon!');go('s-patient-portal');}
+function printCard(){if(!patientRecord)return;const canvas=document.getElementById('home-qr-canvas'),qrData=canvas?canvas.toDataURL():'';const w=window.open('','_blank');if(!w)return;w.document.write(`<!DOCTYPE html><html><head><title>MedCard — ${patientRecord.full_name}</title><style>body{font-family:Georgia,serif;background:#f5d060;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0;flex-direction:column;gap:16px}.card{background:linear-gradient(135deg,#F5D060,#C9A84C,#E8C060,#A07828);border-radius:18px;padding:24px 28px;width:340px;box-shadow:0 6px 24px rgba(0,0,0,.2)}.logo{font-size:11px;font-weight:700;color:#6B4A00;letter-spacing:.06em;margin-bottom:10px}.name{font-size:20px;font-weight:700;color:#3A2800;margin-bottom:3px}.id{font-size:11px;color:#6B4A00;margin-bottom:16px}.footer{display:flex;justify-content:space-between;align-items:flex-end}.qr{width:70px;height:70px;border-radius:6px}.cross{font-size:26px;color:#8B0000;opacity:.85}.tag{font-size:10px;color:#6B4A00;text-align:right;line-height:1.5}.hint{background:#fff;border-radius:10px;padding:10px 16px;font-size:12px;color:#666;max-width:340px;text-align:center}@media print{.hint{display:none}}</style></head><body><div class="card"><div class="logo">&#10010; MedCard</div><div class="name">${patientRecord.full_name}</div><div class="id">ID: ${patientRecord.card_id}</div><div class="footer"><img class="qr" src="${qrData}"><div><div class="cross">&#10010;</div><div class="tag">Scan for<br>emergency info</div></div></div></div><div class="hint">&#128161; Print this page and carry the card in your wallet.</div><script>window.print();<\/script></body></html>`);}
 let loginPins={patient:'',caregiver:''};
-function renderLoginDots(who) { const el=document.getElementById(who[0]+'-dots'); if(!el)return; el.innerHTML=''; for(let i=0;i<4;i++){const d=document.createElement('div');d.className='dot'+(i<loginPins[who].length?' filled':'');el.appendChild(d);} }
-function resetLoginPin(who) { loginPins[who]=''; renderLoginDots(who); const e=document.getElementById(who[0]+'-error'); if(e)e.textContent=''; }
-function buildLoginGrid(who, prefix) {
-  const g=document.getElementById(prefix+'-grid'); if(!g)return; g.innerHTML='';
-  [1,2,3,4,5,6,7,8,9,'',0,'del'].forEach(v=>{
-    const b=document.createElement('button'); b.className='pin-btn'+(v==='del'?' del':'');
-    b.textContent=v==='del'?'⌫':v===''?'':v;
-    if(v!=='') b.onclick=()=>pressLoginPin(who, String(v));
-    g.appendChild(b);
-  });
-}
-function pressLoginPin(who, v) {
-  if(v==='del'){loginPins[who]=loginPins[who].slice(0,-1);renderLoginDots(who);return;}
-  if(loginPins[who].length>=4)return;
-  loginPins[who]+=v; renderLoginDots(who);
-  if(loginPins[who].length===4) checkLoginPin(who);
-}
-async function checkLoginPin(who) {
-  if(!patientRecord) { alert('Please sign in with email first.'); go('s-login'); return; }
-  const stored = who==='patient'?patientRecord.patient_pin:patientRecord.caregiver_pin;
-  if(loginPins[who]===stored) {
-    const errEl=document.getElementById(who[0]+'-error'); if(errEl)errEl.textContent='';
-    if(who==='patient') go('s-patient-portal');
-    else { if(patientRecord.bio_registered) go('s-bio-login'); else go('s-caregiver-portal'); }
-  } else {
-    const errEl=document.getElementById(who[0]+'-error'); if(errEl)errEl.textContent='Wrong PIN — please try again';
-    setTimeout(()=>resetLoginPin(who),900);
-  }
-}
-
-function startPatient() {
-  if(!patientRecord) { go('s-login'); return; }
-  if(!patientRecord.patient_pin) { setupFor='patient'; buildSetupGrid(); go('s-setup-pin'); }
-  else { resetLoginPin('patient'); go('s-patient-login'); }
-}
-function startCaregiver() {
-  if(!patientRecord) { go('s-login'); return; }
-  if(!patientRecord.caregiver_pin) { setupFor='caregiver'; buildSetupGrid(); go('s-setup-pin'); document.getElementById('setup-title').textContent='Set Caregiver PIN'; document.getElementById('setup-sub').textContent='PIN + biometrics for full access'; document.getElementById('setup-notice').textContent='&#128101; This PIN is for authorized caregivers only.'; }
-  else { resetLoginPin('caregiver'); go('s-caregiver-login'); }
-}
-
-// ── BIO LOGIN ──
-function loginBio() {
-  const btn=document.getElementById('bio-login-btn'),st=document.getElementById('bio-login-status');
-  btn.classList.add('scanning'); st.textContent='Scanning...';
-  setTimeout(()=>{ btn.classList.remove('scanning'); st.textContent='Identity confirmed'; setTimeout(()=>go('s-caregiver-portal'),500); },1500);
-}
-
-// ── FORGOT PIN ──
-async function verifyForgot() {
-  const name=document.getElementById('fo-name').value.trim().toLowerCase();
-  const dob=document.getElementById('fo-dob').value.trim();
-  const errEl=document.getElementById('fo-error');
-  if(!patientRecord){errEl.textContent='Please sign in with email first.';return;}
-  if(name===(patientRecord.full_name||'').toLowerCase()&&dob===patientRecord.dob){
-    errEl.textContent='';
-    await db.from('patients').update({patient_pin:null,caregiver_pin:null}).eq('id',currentUser.id);
-    await loadPatientRecord();
-    setupFor='patient'; buildSetupGrid(); go('s-setup-pin');
-    document.getElementById('setup-title').textContent='Reset your PIN';
-    document.getElementById('setup-sub').textContent='Identity verified — choose a new PIN';
-  } else { errEl.textContent="Name or date of birth didn't match. Try again."; }
-}
-
-// ── EMERGENCY PREVIEW ──
-function buildEmergencyPreview() {
-  const d = patientRecord;
-  const el = document.getElementById('em-preview');
-  const urlBox = document.getElementById('em-url-box');
-  const noAcc = document.getElementById('em-no-account');
-  if(!d) { el.innerHTML=''; urlBox.style.display='none'; noAcc.style.display='block'; return; }
-  noAcc.style.display='none';
-  urlBox.style.display='flex';
-  document.getElementById('em-url-text').textContent=emergencyURL();
-  const allergies=(d.allergies||[]).map(a=>`<span style="display:inline-block;background:#FDECEA;color:#C0392B;border-radius:20px;padding:2px 10px;font-size:13px;font-weight:bold;margin:2px">${a}</span>`).join('');
-  const meds=(d.medications||[]).map(m=>`<span style="display:inline-block;background:#EAF3DE;color:#2E7D32;border-radius:20px;padding:2px 10px;font-size:13px;font-weight:bold;margin:2px">${m}</span>`).join('');
-  el.innerHTML=`
-    <div style="background:linear-gradient(135deg,#F5D060,#C9A84C,#E8C060,#A07828);border-radius:14px;padding:1.1rem 1.25rem;margin-bottom:0.75rem;box-shadow:0 3px 12px rgba(180,140,30,0.25)">
-      <div style="font-size:11px;font-weight:bold;color:#6B4A00;letter-spacing:0.05em;margin-bottom:6px">&#10010; MEDCARD EMERGENCY RECORD</div>
-      <div style="font-size:17px;font-weight:bold;color:#3A2800">${d.full_name||'—'}</div>
-      <div style="font-size:12px;color:#6B4A00">DOB: ${d.dob||'—'} &nbsp;|&nbsp; Blood: <strong style="color:#5A1010">${d.blood_type||'?'}</strong></div>
-    </div>
-    <div style="background:#fff;border:1.5px solid #e8d9a0;border-radius:12px;padding:0.85rem 1rem;margin-bottom:0.65rem">
-      <div style="font-size:10px;letter-spacing:0.1em;text-transform:uppercase;color:#8B6914;font-weight:bold;margin-bottom:6px">&#9888; Allergies</div>
-      <div>${allergies||'<span style="font-size:13px;color:#999">None recorded</span>'}</div>
-    </div>
-    <div style="background:#fff;border:1.5px solid #e8d9a0;border-radius:12px;padding:0.85rem 1rem;margin-bottom:0.65rem">
-      <div style="font-size:10px;letter-spacing:0.1em;text-transform:uppercase;color:#8B6914;font-weight:bold;margin-bottom:6px">Medications</div>
-      <div>${meds||'<span style="font-size:13px;color:#999">None recorded</span>'}</div>
-    </div>
-    <div style="background:#fff;border:1.5px solid #e8d9a0;border-radius:12px;padding:0.85rem 1rem;margin-bottom:0.65rem">
-      <div style="font-size:10px;letter-spacing:0.1em;text-transform:uppercase;color:#8B6914;font-weight:bold;margin-bottom:6px">Emergency Contacts</div>
-      <div style="font-size:14px;padding:3px 0"><span style="color:#666;font-size:13px">Primary:</span> ${d.ec1_name||'—'} — ${d.ec1_phone||'—'}</div>
-      <div style="font-size:14px;padding:3px 0"><span style="color:#666;font-size:13px">Doctor:</span> ${d.doctor_name||'—'} — ${d.doctor_phone||'—'}</div>
-    </div>`;
-}
-
-function copyURL() {
-  navigator.clipboard.writeText(emergencyURL()).then(()=>{ const b=document.querySelector('.copy-btn'); b.textContent='Copied!'; setTimeout(()=>b.textContent='Copy',2000); });
-}
-
-// ── FORMS ──
-const PATIENT_SECTIONS = [
-  {label:'About you',fields:[{l:'Your full name',k:'full_name'},{l:'Date of birth (MM/DD/YYYY)',k:'dob'},{l:'Blood type (e.g. A+, O-)',k:'blood_type'},{l:'Weight in pounds',k:'weight_lbs'}]},
-  {label:'Allergies',tags:'allergies'},
-  {label:'Your current medications',tags:'medications'},
-  {label:'Health conditions',fields:[{l:'List any health conditions you have',k:'conditions',ta:true}]},
-  {label:'Emergency contacts',fields:[{l:'Contact name & their relationship to you',k:'ec1_name'},{l:'Their phone number',k:'ec1_phone'},{l:"Your doctor's name",k:'doctor_name'},{l:"Your doctor's phone number",k:'doctor_phone'}]},
-  {label:'Your wishes',fields:[{l:'Do you have a DNR on file? (Yes / No)',k:'dnr'},{l:'Are you an organ donor? (Yes / No)',k:'organ_donor'}]}
-];
-const CAREGIVER_SECTIONS = [
-  {label:'Patient basics',fields:[{l:'Patient full name',k:'full_name'},{l:'Date of birth (MM/DD/YYYY)',k:'dob'},{l:'Blood type',k:'blood_type'},{l:'Weight in pounds',k:'weight_lbs'}]},
-  {label:'Allergies',tags:'allergies'},
-  {label:'Current medications',tags:'medications'},
-  {label:'Medical history',fields:[{l:'Active conditions',k:'conditions',ta:true},{l:'Surgical history',k:'surgery_history',ta:true},{l:'Additional notes for emergency staff',k:'emergency_notes',ta:true}]},
-  {label:'Emergency contacts',fields:[{l:'Primary contact name & relationship',k:'ec1_name'},{l:'Primary contact phone',k:'ec1_phone'},{l:"Doctor's name",k:'doctor_name'},{l:"Doctor's phone",k:'doctor_phone'}]},
-  {label:'Directives & insurance',fields:[{l:'DNR on file? (Yes / No)',k:'dnr'},{l:'Organ donor? (Yes / No)',k:'organ_donor'},{l:'Insurance provider & policy number',k:'insurance'}]}
-];
+function renderLoginDots(who){const pre=who==='patient'?'p':'c',el=document.getElementById(pre+'-dots');if(!el)return;el.innerHTML='';for(let i=0;i<4;i++){const d=document.createElement('div');d.className='dot'+(i<loginPins[who].length?' filled':'');el.appendChild(d);}}
+function resetLoginPin(who){loginPins[who]='';renderLoginDots(who);const pre=who==='patient'?'p':'c',e=document.getElementById(pre+'-error');if(e)e.textContent='';}
+function buildLoginGrid(who,prefix){const g=document.getElementById(prefix+'-grid');if(!g)return;g.innerHTML='';[1,2,3,4,5,6,7,8,9,'',0,'del'].forEach(v=>{const b=document.createElement('button');b.className='pin-btn'+(v==='del'?' del':'');b.textContent=v==='del'?'⌫':v===''?'':v;if(v!=='')b.onclick=()=>pressLoginPin(who,String(v));g.appendChild(b);});}
+function pressLoginPin(who,v){if(v==='del'){loginPins[who]=loginPins[who].slice(0,-1);renderLoginDots(who);return;}if(loginPins[who].length>=4)return;loginPins[who]+=v;renderLoginDots(who);if(loginPins[who].length===4)checkLoginPin(who);}
+async function checkLoginPin(who){if(!patientRecord){go('s-login');return;}const stored=who==='patient'?patientRecord.patient_pin:patientRecord.caregiver_pin,pre=who==='patient'?'p':'c';if(loginPins[who]===stored){document.getElementById(pre+'-error').textContent='';if(who==='patient')go('s-patient-portal');else{if(patientRecord.bio_registered)go('s-bio-login');else go('s-patient-portal');}}else{document.getElementById(pre+'-error').textContent='Wrong PIN — please try again';setTimeout(()=>resetLoginPin(who),900);}}
+function startPatient(){if(!patientRecord){go('s-login');return;}if(!patientRecord.patient_pin){setupFor='patient';buildSetupGrid();go('s-setup-pin');}else{resetLoginPin('patient');go('s-patient-login');}}
+function startCaregiver(){if(!patientRecord){go('s-login');return;}if(!patientRecord.caregiver_pin){setupFor='caregiver';buildSetupGrid();go('s-setup-pin');document.getElementById('setup-title').textContent='Set Caregiver PIN';document.getElementById('setup-sub').textContent='PIN + biometrics for full access';}else{resetLoginPin('caregiver');go('s-caregiver-login');}}
+async function verifyForgot(){const name=document.getElementById('fo-name').value.trim().toLowerCase(),dob=document.getElementById('fo-dob').value.trim(),errEl=document.getElementById('fo-error');if(!patientRecord){errEl.textContent='Please sign in with email first.';return;}if(name===(patientRecord.full_name||'').toLowerCase()&&dob===patientRecord.dob){errEl.textContent='';await db.from('patients').update({patient_pin:null,caregiver_pin:null}).eq('id',currentUser.id);await loadPatientRecord();setupFor='patient';buildSetupGrid();go('s-setup-pin');document.getElementById('setup-title').textContent='Reset your PIN';document.getElementById('setup-sub').textContent='Identity verified — choose a new PIN';}else{errEl.textContent="Name or date of birth didn't match. Try again.";}}
 let saveTimer=null;
-function buildForm(who) {
-  const secs=who==='patient'?PATIENT_SECTIONS:CAREGIVER_SECTIONS;
-  const target=document.getElementById(who[0]+'-form'); if(!target)return; target.innerHTML='';
-  if(!patientRecord){target.innerHTML='<div class="loading-box">Loading your info...</div>';return;}
-  secs.forEach(sec=>{
-    const sl=document.createElement('div');sl.className='section-label';sl.textContent=sec.label;target.appendChild(sl);
-    if(sec.tags){
-      const wrap=document.createElement('div');wrap.className='tag-input-area mb1';wrap.dataset.key=sec.tags;
-      (patientRecord[sec.tags]||[]).forEach(t=>wrap.appendChild(makeTag(t,wrap)));
-      const inp=document.createElement('input');inp.className='mini-input';inp.placeholder='Add + Enter';
-      inp.onkeydown=e=>{if(e.key==='Enter'&&inp.value.trim()){wrap.insertBefore(makeTag(inp.value.trim(),wrap),inp);inp.value='';autoSaveTags(wrap,sec.tags);}};
-      wrap.appendChild(inp);target.appendChild(wrap);
-    } else {
-      sec.fields.forEach(f=>{
-        const g=document.createElement('div');g.className='form-group';
-        const lbl=document.createElement('label');lbl.className='form-label';lbl.textContent=f.l;g.appendChild(lbl);
-        const inp=f.ta?document.createElement('textarea'):document.createElement('input');
-        inp.className='form-input'+(f.ta?' form-textarea':'');
-        inp.value=patientRecord[f.k]||'';
-        inp.oninput=()=>{ if(!patientRecord)return; patientRecord[f.k]=inp.value; clearTimeout(saveTimer); saveTimer=setTimeout(()=>saveToSupabase(),1200); };
-        g.appendChild(inp);target.appendChild(g);
-      });
-    }
-  });
-}
-function makeTag(text,wrap){
-  const tag=document.createElement('div');tag.className='tag';
-  tag.innerHTML=text+' <span class="tag-x">×</span>';
-  tag.querySelector('.tag-x').onclick=()=>{wrap.removeChild(tag);autoSaveTags(wrap,wrap.dataset.key);};
-  return tag;
-}
-function autoSaveTags(wrap,key){
-  const tags=[...wrap.querySelectorAll('.tag')].map(t=>t.textContent.replace('×','').trim());
-  if(patientRecord){patientRecord[key]=tags;} saveToSupabase();
-}
-async function saveToSupabase(){
-  if(!currentUser||!patientRecord)return;
-  const fields={full_name:patientRecord.full_name,dob:patientRecord.dob,blood_type:patientRecord.blood_type,weight_lbs:patientRecord.weight_lbs,allergies:patientRecord.allergies,medications:patientRecord.medications,conditions:patientRecord.conditions,surgery_history:patientRecord.surgery_history,emergency_notes:patientRecord.emergency_notes,ec1_name:patientRecord.ec1_name,ec1_phone:patientRecord.ec1_phone,doctor_name:patientRecord.doctor_name,doctor_phone:patientRecord.doctor_phone,dnr:patientRecord.dnr,organ_donor:patientRecord.organ_donor,insurance:patientRecord.insurance};
-  await db.from('patients').update(fields).eq('id',currentUser.id);
-  updateHomeCard();
-}
-async function savePortal(who){
-  if(who==='caregiver'){const cf=document.getElementById('c-form');const tws=cf.querySelectorAll('.tag-input-area');tws.forEach(w=>autoSaveTags(w,w.dataset.key));}
-  await saveToSupabase();
-  go('s-saved');
-}
-
-// ── INIT ──
-async function init(){
-  buildQR('qr-home');
-  buildSetupGrid();
-  buildLoginGrid('patient','p');
-  buildLoginGrid('caregiver','c');
-  const { data } = await db.auth.getSession();
-  if(data?.session?.user){
-    currentUser=data.session.user;
-    await loadPatientRecord();
-  }
-}
+function autosave(key,val){if(!patientRecord)return;patientRecord[key]=val;clearTimeout(saveTimer);saveTimer=setTimeout(()=>pushToSupabase(),1500);}
+async function pushToSupabase(){if(!currentUser||!patientRecord)return;const fields={full_name:patientRecord.full_name,dob:patientRecord.dob,blood_type:patientRecord.blood_type,weight_lbs:patientRecord.weight_lbs,height:patientRecord.height,language:patientRecord.language,conditions_list:patientRecord.conditions_list,conditions_other:patientRecord.conditions_other,surgery_history:patientRecord.surgery_history,code_status:patientRecord.code_status,blood_transfusion:patientRecord.blood_transfusion,organ_donor:patientRecord.organ_donor,living_will:patientRecord.living_will,has_poa:patientRecord.has_poa,poa_name:patientRecord.poa_name,poa_phone:patientRecord.poa_phone,poa_address:patientRecord.poa_address,has_mhpoa:patientRecord.has_mhpoa,mhpoa_name:patientRecord.mhpoa_name,mhpoa_phone:patientRecord.mhpoa_phone,mhpoa_address:patientRecord.mhpoa_address,ec1_name:patientRecord.ec1_name,ec1_phone:patientRecord.ec1_phone,ec2_name:patientRecord.ec2_name,ec2_phone:patientRecord.ec2_phone,doctor_name:patientRecord.doctor_name,doctor_phone:patientRecord.doctor_phone,doctor_office:patientRecord.doctor_office,medications_json:patientRecord.medications_json,allergies_json:patientRecord.allergies_json,devices:patientRecord.devices};await db.from('patients').update(fields).eq('id',currentUser.id);updateHomeCard();}
+function loadPortalGreeting(){if(!patientRecord)return;const g=document.getElementById('portal-greeting');if(g)g.textContent='Welcome back, '+(patientRecord.full_name?patientRecord.full_name.split(' ')[0]:'')+'  👋';}
+function loadBasics(){if(!patientRecord)return;setVal('f-name',patientRecord.full_name);setVal('f-dob',patientRecord.dob);setSel('f-blood',patientRecord.blood_type);setVal('f-weight',patientRecord.weight_lbs);setVal('f-height',patientRecord.height);setSel('f-language',patientRecord.language);}
+function loadContacts(){if(!patientRecord)return;setVal('f-ec1-name',patientRecord.ec1_name);setVal('f-ec1-phone',patientRecord.ec1_phone);setVal('f-ec2-name',patientRecord.ec2_name);setVal('f-ec2-phone',patientRecord.ec2_phone);setVal('f-dr-name',patientRecord.doctor_name);setVal('f-dr-phone',patientRecord.doctor_phone);setVal('f-dr-office',patientRecord.doctor_office);}
+function loadDirectives(){if(!patientRecord)return;setSel('f-code-status',patientRecord.code_status);if(patientRecord.code_status)showCodeDef(patientRecord.code_status);setRadio('transfusion-group',patientRecord.blood_transfusion);setRadio('donor-group',patientRecord.organ_donor);setRadio('living-will-group',patientRecord.living_will);setRadio('poa-group',patientRecord.has_poa);if(patientRecord.has_poa==='Yes')toggleSection('poa-section',true);setVal('f-poa-name',patientRecord.poa_name);setVal('f-poa-phone',patientRecord.poa_phone);setVal('f-poa-address',patientRecord.poa_address);setRadio('mhpoa-group',patientRecord.has_mhpoa);if(patientRecord.has_mhpoa==='Yes')toggleSection('mhpoa-section',true);setVal('f-mhpoa-name',patientRecord.mhpoa_name);setVal('f-mhpoa-phone',patientRecord.mhpoa_phone);setVal('f-mhpoa-address',patientRecord.mhpoa_address);}
+function setVal(id,val){const el=document.getElementById(id);if(el)el.value=val||'';}
+function setSel(id,val){const el=document.getElementById(id);if(el&&val)el.value=val;}
+function setRadio(groupId,val){if(!val)return;document.querySelectorAll('#'+groupId+' .radio-btn').forEach(b=>b.classList.toggle('selected',b.textContent.trim()===val));}
+function selectRadio(groupId,val){document.querySelectorAll('#'+groupId+' .radio-btn').forEach(b=>b.classList.toggle('selected',b.textContent.trim()===val));}
+function toggleSection(id,show){const el=document.getElementById(id);if(el)el.style.display=show?'block':'none';}
+const CONDITIONS=['Hypertension (High Blood Pressure)','Type 1 Diabetes','Type 2 Diabetes','Heart Disease / Coronary Artery Disease','Heart Failure (CHF)','Atrial Fibrillation (AFib)','Asthma','COPD','Chronic Kidney Disease','Stroke / TIA history','Cancer (active)','Cancer (in remission)','Epilepsy / Seizure disorder','Thyroid disease','HIV/AIDS','Hepatitis B','Hepatitis C','Liver disease / Cirrhosis',"Crohn's disease / IBD",'Lupus','Rheumatoid Arthritis','Multiple Sclerosis',"Parkinson's disease","Alzheimer's / Dementia",'Depression','Anxiety disorder','Bipolar disorder','Schizophrenia','PTSD','Substance use disorder','Sickle cell disease','Anemia','Osteoporosis','Obesity','Sleep apnea','Chronic pain'];
+function loadConditions(){if(!patientRecord)return;const wrap=document.getElementById('conditions-checkboxes');wrap.innerHTML='';const saved=patientRecord.conditions_list||[];CONDITIONS.forEach(c=>{const row=document.createElement('label');row.style.cssText='display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:0.5px solid #eee;font-size:14px;cursor:pointer;';const cb=document.createElement('input');cb.type='checkbox';cb.style.cssText='width:18px;height:18px;accent-color:#C9A84C;flex-shrink:0;';cb.checked=saved.includes(c);cb.onchange=()=>{const list=[...(patientRecord.conditions_list||[])];if(cb.checked){if(!list.includes(c))list.push(c);}else{const i=list.indexOf(c);if(i>-1)list.splice(i,1);}patientRecord.conditions_list=list;pushToSupabase();};row.appendChild(cb);row.appendChild(document.createTextNode(c));wrap.appendChild(row);});setVal('f-conditions-other',patientRecord.conditions_other);setVal('f-surgery',patientRecord.surgery_history);}
+function resetAddMed(){document.getElementById('med-name-select').value='';document.getElementById('med-name-input').value='';document.getElementById('med-dose').value='';document.getElementById('med-freq').value='';document.getElementById('med-reason').value='';document.getElementById('med-error').textContent='';}
+function renderMeds(){const wrap=document.getElementById('med-list');if(!wrap)return;wrap.innerHTML='';const meds=patientRecord?.medications_json||[];if(meds.length===0){wrap.innerHTML='<div class="empty-state">No medications added yet</div>';return;}meds.forEach((m,i)=>{const card=document.createElement('div');card.className='item-card';card.innerHTML=`<div class="item-card-info"><div class="item-card-title">${m.name}</div><div class="item-card-sub">${[m.dose,m.freq,m.reason].filter(Boolean).join(' &bull; ')}</div></div><button class="item-delete" onclick="deleteMed(${i})">&#10005;</button>`;wrap.appendChild(card);});}
+function medNameFromSelect(v){if(v)document.getElementById('med-name-input').value=v;}
+function saveMed(){const name=(document.getElementById('med-name-input').value||'').trim(),dose=document.getElementById('med-dose').value.trim(),freq=document.getElementById('med-freq').value,reason=document.getElementById('med-reason').value.trim(),errEl=document.getElementById('med-error');if(!name){errEl.textContent='Please enter or select a medication name.';return;}if(!dose){errEl.textContent='Please enter the dose amount.';return;}if(!freq){errEl.textContent='Please select how often you take it.';return;}if(!patientRecord.medications_json)patientRecord.medications_json=[];patientRecord.medications_json.push({name,dose,freq,reason});pushToSupabase();go('s-medications');}
+function deleteMed(i){if(!patientRecord.medications_json)return;patientRecord.medications_json.splice(i,1);pushToSupabase();renderMeds();}
+function resetAddAllergy(){document.getElementById('allergy-name-select').value='';document.getElementById('allergy-name-input').value='';document.getElementById('allergy-reaction').value='';selectedSeverity='';document.querySelectorAll('#severity-group .radio-btn').forEach(b=>b.classList.remove('selected'));document.getElementById('allergy-error').textContent='';}
+function renderAllergies(){const wrap=document.getElementById('allergy-list');if(!wrap)return;wrap.innerHTML='';const allergies=patientRecord?.allergies_json||[];if(allergies.length===0){wrap.innerHTML='<div class="empty-state">No allergies added yet</div>';return;}allergies.forEach((a,i)=>{const sev=a.severity||'',sevCls=sev==='Mild'?'sev-mild':sev==='Moderate'?'sev-moderate':sev==='Severe'?'sev-severe':'sev-lifethreatening';const card=document.createElement('div');card.className='item-card';card.innerHTML=`<div class="item-card-info"><div class="item-card-title">${a.name}</div><div class="item-card-sub">${a.reaction||''}</div>${sev?`<span class="severity-pill ${sevCls}">${sev}</span>`:''}</div><button class="item-delete" onclick="deleteAllergy(${i})">&#10005;</button>`;wrap.appendChild(card);});}
+function allergyNameFromSelect(v){if(v)document.getElementById('allergy-name-input').value=v;}
+function selectSeverity(val){selectedSeverity=val;document.querySelectorAll('#severity-group .radio-btn').forEach(b=>b.classList.toggle('selected',b.textContent===val));}
+function saveAllergy(){const name=(document.getElementById('allergy-name-input').value||'').trim(),reaction=document.getElementById('allergy-reaction').value,errEl=document.getElementById('allergy-error');if(!name){errEl.textContent='Please enter or select an allergy name.';return;}if(!reaction){errEl.textContent='Please select a reaction type.';return;}if(!selectedSeverity){errEl.textContent='Please select a severity level.';return;}if(!patientRecord.allergies_json)patientRecord.allergies_json=[];patientRecord.allergies_json.push({name,reaction,severity:selectedSeverity});pushToSupabase();go('s-allergies');}
+function deleteAllergy(i){if(!patientRecord.allergies_json)return;patientRecord.allergies_json.splice(i,1);pushToSupabase();renderAllergies();}
+function resetAddDevice(){document.getElementById('device-type-select').value='';document.getElementById('device-name-input').value='';document.getElementById('device-year').value='';document.getElementById('device-brand').value='';document.getElementById('device-error').textContent='';}
+function renderDevices(){const wrap=document.getElementById('device-list');if(!wrap)return;wrap.innerHTML='';const devices=patientRecord?.devices||[];if(devices.length===0){wrap.innerHTML='<div class="empty-state">No implanted devices added yet</div>';return;}devices.forEach((d,i)=>{const card=document.createElement('div');card.className='item-card';card.innerHTML=`<div class="item-card-info"><div class="item-card-title">${d.name}</div><div class="item-card-sub">${[d.brand,d.year?'Implanted '+d.year:''].filter(Boolean).join(' &bull; ')}</div></div><button class="item-delete" onclick="deleteDevice(${i})">&#10005;</button>`;wrap.appendChild(card);});}
+function deviceFromSelect(v){if(v)document.getElementById('device-name-input').value=v;}
+function saveDevice(){const name=(document.getElementById('device-name-input').value||'').trim(),year=document.getElementById('device-year').value.trim(),brand=document.getElementById('device-brand').value.trim(),errEl=document.getElementById('device-error');if(!name){errEl.textContent='Please enter or select a device type.';return;}if(!patientRecord.devices)patientRecord.devices=[];patientRecord.devices.push({name,year,brand});pushToSupabase();go('s-devices');}
+function deleteDevice(i){if(!patientRecord.devices)return;patientRecord.devices.splice(i,1);pushToSupabase();renderDevices();}
+const CODE_DEFS={'Full Code':'All life-saving measures will be used — CPR, electric shocks to the heart, breathing tubes, and any other treatment needed to keep you alive.','DNR':'If your heart stops, medical staff will NOT perform CPR. You will still receive all other medical care and comfort measures.','DNI':'Medical staff will NOT put a breathing tube down your throat or place you on a ventilator. CPR may still be performed.','DNR/DNI':'No CPR and no breathing tubes. You will receive comfort care and pain management only.','Comfort Care':'The focus is entirely on keeping you comfortable and free from pain. No life-prolonging treatments will be used.'};
+function showCodeDef(val){const box=document.getElementById('code-def');if(!box)return;if(CODE_DEFS[val]){box.textContent=CODE_DEFS[val];box.classList.add('show');}else{box.classList.remove('show');}}
+function toggleCodeInfo(){const box=document.getElementById('code-def');if(box)box.classList.toggle('show');}
+function buildEmergencyPreview(){const d=patientRecord,el=document.getElementById('em-preview'),urlBox=document.getElementById('em-url-box'),noAcc=document.getElementById('em-no-account');if(!d){el.innerHTML='';if(urlBox)urlBox.style.display='none';if(noAcc)noAcc.style.display='block';return;}if(noAcc)noAcc.style.display='none';if(urlBox){urlBox.style.display='flex';document.getElementById('em-url-text').textContent=emergencyURL();}const allergies=(d.allergies_json||[]).map(a=>`<span style="display:inline-block;background:#FDECEA;color:#C0392B;border-radius:20px;padding:2px 10px;font-size:12px;font-weight:bold;margin:2px">${a.name} <em style="font-weight:normal">(${a.severity})</em></span>`).join('');const meds=(d.medications_json||[]).map(m=>`<span style="display:inline-block;background:#EAF3DE;color:#2E7D32;border-radius:20px;padding:2px 10px;font-size:12px;font-weight:bold;margin:2px">${m.name} ${m.dose}</span>`).join('');const devices=(d.devices||[]).map(dv=>`<span style="display:inline-block;background:#E6F1FB;color:#185FA5;border-radius:20px;padding:2px 10px;font-size:12px;font-weight:bold;margin:2px">${dv.name}</span>`).join('');el.innerHTML=`<div style="background:linear-gradient(135deg,#F5D060,#C9A84C,#E8C060,#A07828);border-radius:14px;padding:1rem 1.2rem;margin-bottom:0.75rem"><div style="font-size:10px;font-weight:bold;color:#6B4A00;letter-spacing:.06em;margin-bottom:6px">&#10010; MEDCARD EMERGENCY RECORD</div><div style="font-size:17px;font-weight:bold;color:#3A2800">${d.full_name||'—'}</div><div style="font-size:12px;color:#6B4A00;margin-top:3px">DOB: ${d.dob||'—'} &nbsp;|&nbsp; Blood: <strong style="color:#5A1010">${d.blood_type||'?'}</strong>${d.code_status?` &nbsp;|&nbsp; Code: <strong style="color:#8B0000">${d.code_status}</strong>`:''}</div></div><div style="background:#fff;border:1.5px solid #e8d9a0;border-radius:12px;padding:.8rem 1rem;margin-bottom:.6rem"><div style="font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:#8B6914;font-weight:bold;margin-bottom:5px">&#9888; Allergies</div><div>${allergies||'<span style="font-size:13px;color:#999">None recorded</span>'}</div></div><div style="background:#fff;border:1.5px solid #e8d9a0;border-radius:12px;padding:.8rem 1rem;margin-bottom:.6rem"><div style="font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:#8B6914;font-weight:bold;margin-bottom:5px">Medications</div><div>${meds||'<span style="font-size:13px;color:#999">None recorded</span>'}</div></div>${devices?`<div style="background:#fff;border:1.5px solid #e8d9a0;border-radius:12px;padding:.8rem 1rem;margin-bottom:.6rem"><div style="font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:#8B6914;font-weight:bold;margin-bottom:5px">Implanted Devices</div><div>${devices}</div></div>`:''}${d.ec1_name?`<div style="background:#fff;border:1.5px solid #e8d9a0;border-radius:12px;padding:.8rem 1rem;margin-bottom:.6rem"><div style="font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:#8B6914;font-weight:bold;margin-bottom:5px">Emergency Contacts</div><div style="font-size:13px;padding:2px 0">${d.ec1_name} — ${d.ec1_phone||'—'}</div>${d.ec2_name?`<div style="font-size:13px;padding:2px 0">${d.ec2_name} — ${d.ec2_phone||'—'}</div>`:''}${d.doctor_name?`<div style="font-size:13px;padding:2px 0">Dr: ${d.doctor_name} — ${d.doctor_phone||'—'}</div>`:''}</div>`:''}`;} 
+function copyURL(){navigator.clipboard.writeText(emergencyURL()).then(()=>{const b=document.querySelector('.copy-btn');b.textContent='Copied!';setTimeout(()=>b.textContent='Copy',2000);});}
+async function init(){buildLoginGrid('patient','p');buildLoginGrid('caregiver','c');const{data}=await db.auth.getSession();if(data?.session?.user){currentUser=data.session.user;await loadPatientRecord();}}
 init();
 </script>
 </body>
