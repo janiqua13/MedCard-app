@@ -153,7 +153,19 @@
     <div class="form-group"><label class="form-label">Password</label><input class="form-input" id="li-password" type="password" placeholder="Your password"></div>
     <div class="form-error" id="li-error"></div>
     <button class="btn btn-gold" id="li-btn" onclick="login()">Sign in</button>
-    <button class="btn-ghost mt-half" onclick="go('s-signup')">Don't have an account? Sign up free</button>
+    <button class="btn-ghost mt-half" onclick="go('s-forgot-password')">Forgot your password?</button>
+    <button class="btn-ghost" onclick="go('s-signup')">Don't have an account? Sign up free</button>
+  </div>
+
+  <!-- FORGOT PASSWORD -->
+  <div class="screen" id="s-forgot-password">
+    <div class="app-header"><button class="back-btn" onclick="go('s-login')">&#8592;</button><div><div class="app-title">Reset Password</div><div class="app-subtitle">We'll send you a reset link by email</div></div></div>
+    <div class="notice">&#128140; Enter the email address you used to create your MedCard. We'll send you a link to reset your password.</div>
+    <div class="form-group"><label class="form-label">Your email address</label><input class="form-input" id="reset-email" type="email" placeholder="you@email.com"></div>
+    <div class="form-error" id="reset-error"></div>
+    <div class="success-box" id="reset-success" style="display:none">&#10003; Reset link sent! Check your email inbox and click the link to choose a new password.</div>
+    <button class="btn btn-gold" id="reset-btn" onclick="sendPasswordReset()">Send reset link</button>
+    <button class="btn-ghost mt-half" onclick="go('s-login')">Back to sign in</button>
   </div>
 
   <!-- SETUP PIN -->
@@ -550,7 +562,7 @@ const BASE_URL = 'https://med-card-app-oobx.vercel.app';
 const { createClient } = supabase;
 const db = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 let currentUser=null,patientRecord=null,setupFor=null,selectedSeverity='';
-const SCREENS=['s-home','s-signup','s-login','s-setup-pin','s-bio-setup','s-card-option','s-patient-login','s-caregiver-login','s-bio-login','s-forgot','s-emergency-demo','s-patient-portal','s-basics','s-medications','s-add-med','s-allergies','s-add-allergy','s-conditions','s-devices','s-add-device','s-directives','s-contacts','s-saved'];
+const SCREENS=['s-home','s-signup','s-login','s-forgot-password','s-setup-pin','s-bio-setup','s-card-option','s-patient-login','s-caregiver-login','s-bio-login','s-forgot','s-emergency-demo','s-patient-portal','s-basics','s-medications','s-add-med','s-allergies','s-add-allergy','s-conditions','s-devices','s-add-device','s-directives','s-contacts','s-saved'];
 function go(id){SCREENS.forEach(s=>{const el=document.getElementById(s);if(el)el.classList.remove('active');});const t=document.getElementById(id);if(t)t.classList.add('active');if(id==='s-patient-portal')loadPortalGreeting();if(id==='s-basics')loadBasics();if(id==='s-medications')renderMeds();if(id==='s-allergies')renderAllergies();if(id==='s-conditions')loadConditions();if(id==='s-devices')renderDevices();if(id==='s-directives')loadDirectives();if(id==='s-contacts')loadContacts();if(id==='s-emergency-demo')buildEmergencyPreview();if(id==='s-card-option')updateCardOption();if(id==='s-add-med')resetAddMed();if(id==='s-add-allergy')resetAddAllergy();if(id==='s-add-device')resetAddDevice();updateHomeCard();}
 function generateQR(canvasId,url){if(!url)return;const canvas=document.getElementById(canvasId);if(!canvas)return;QRCode.toCanvas(canvas,url,{width:64,margin:0,color:{dark:'#000000',light:'#ffffff'}},()=>{});}
 function emergencyURL(){return patientRecord?`${BASE_URL}/${patientRecord.card_slug}`:'';} 
@@ -616,6 +628,19 @@ function showCodeDef(val){const box=document.getElementById('code-def');if(!box)
 function toggleCodeInfo(){const box=document.getElementById('code-def');if(box)box.classList.toggle('show');}
 function buildEmergencyPreview(){const d=patientRecord,el=document.getElementById('em-preview'),urlBox=document.getElementById('em-url-box'),noAcc=document.getElementById('em-no-account');if(!d){el.innerHTML='';if(urlBox)urlBox.style.display='none';if(noAcc)noAcc.style.display='block';return;}if(noAcc)noAcc.style.display='none';if(urlBox){urlBox.style.display='flex';document.getElementById('em-url-text').textContent=emergencyURL();}const allergies=(d.allergies_json||[]).map(a=>`<span style="display:inline-block;background:#FDECEA;color:#C0392B;border-radius:20px;padding:2px 10px;font-size:12px;font-weight:bold;margin:2px">${a.name} <em style="font-weight:normal">(${a.severity})</em></span>`).join('');const meds=(d.medications_json||[]).map(m=>`<span style="display:inline-block;background:#EAF3DE;color:#2E7D32;border-radius:20px;padding:2px 10px;font-size:12px;font-weight:bold;margin:2px">${m.name} ${m.dose}</span>`).join('');const devices=(d.devices||[]).map(dv=>`<span style="display:inline-block;background:#E6F1FB;color:#185FA5;border-radius:20px;padding:2px 10px;font-size:12px;font-weight:bold;margin:2px">${dv.name}</span>`).join('');el.innerHTML=`<div style="background:linear-gradient(135deg,#F5D060,#C9A84C,#E8C060,#A07828);border-radius:14px;padding:1rem 1.2rem;margin-bottom:0.75rem"><div style="font-size:10px;font-weight:bold;color:#6B4A00;letter-spacing:.06em;margin-bottom:6px">&#10010; MEDCARD EMERGENCY RECORD</div><div style="font-size:17px;font-weight:bold;color:#3A2800">${d.full_name||'—'}</div><div style="font-size:12px;color:#6B4A00;margin-top:3px">DOB: ${d.dob||'—'} &nbsp;|&nbsp; Blood: <strong style="color:#5A1010">${d.blood_type||'?'}</strong>${d.code_status?` &nbsp;|&nbsp; Code: <strong style="color:#8B0000">${d.code_status}</strong>`:''}</div></div><div style="background:#fff;border:1.5px solid #e8d9a0;border-radius:12px;padding:.8rem 1rem;margin-bottom:.6rem"><div style="font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:#8B6914;font-weight:bold;margin-bottom:5px">&#9888; Allergies</div><div>${allergies||'<span style="font-size:13px;color:#999">None recorded</span>'}</div></div><div style="background:#fff;border:1.5px solid #e8d9a0;border-radius:12px;padding:.8rem 1rem;margin-bottom:.6rem"><div style="font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:#8B6914;font-weight:bold;margin-bottom:5px">Medications</div><div>${meds||'<span style="font-size:13px;color:#999">None recorded</span>'}</div></div>${devices?`<div style="background:#fff;border:1.5px solid #e8d9a0;border-radius:12px;padding:.8rem 1rem;margin-bottom:.6rem"><div style="font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:#8B6914;font-weight:bold;margin-bottom:5px">Implanted Devices</div><div>${devices}</div></div>`:''}${d.ec1_name?`<div style="background:#fff;border:1.5px solid #e8d9a0;border-radius:12px;padding:.8rem 1rem;margin-bottom:.6rem"><div style="font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:#8B6914;font-weight:bold;margin-bottom:5px">Emergency Contacts</div><div style="font-size:13px;padding:2px 0">${d.ec1_name} — ${d.ec1_phone||'—'}</div>${d.ec2_name?`<div style="font-size:13px;padding:2px 0">${d.ec2_name} — ${d.ec2_phone||'—'}</div>`:''}${d.doctor_name?`<div style="font-size:13px;padding:2px 0">Dr: ${d.doctor_name} — ${d.doctor_phone||'—'}</div>`:''}</div>`:''}`;} 
 function copyURL(){navigator.clipboard.writeText(emergencyURL()).then(()=>{const b=document.querySelector('.copy-btn');b.textContent='Copied!';setTimeout(()=>b.textContent='Copy',2000);});}
+async function sendPasswordReset(){
+  const email=document.getElementById('reset-email').value.trim();
+  const errEl=document.getElementById('reset-error');
+  const successEl=document.getElementById('reset-success');
+  const btn=document.getElementById('reset-btn');
+  if(!email){errEl.textContent='Please enter your email address.';return;}
+  errEl.textContent='';
+  btn.innerHTML='<span class="spinner"></span>Sending...'; btn.disabled=true;
+  const{error}=await db.auth.resetPasswordForEmail(email,{redirectTo:window.location.origin+window.location.pathname});
+  btn.textContent='Send reset link'; btn.disabled=false;
+  if(error){errEl.textContent=error.message;}
+  else{successEl.style.display='block';document.getElementById('reset-email').value='';}
+}
 async function init(){buildLoginGrid('patient','p');buildLoginGrid('caregiver','c');const{data}=await db.auth.getSession();if(data?.session?.user){currentUser=data.session.user;await loadPatientRecord();}}
 init();
 </script>
